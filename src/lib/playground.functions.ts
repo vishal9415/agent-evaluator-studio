@@ -247,7 +247,7 @@ export const runEvaluation = createServerFn({ method: "POST" })
       .select()
       .single();
     if (evalErr || !evalRow) throw new Error(evalErr?.message || "Failed to create evaluation");
-    const evalId = evalRow.id;
+    const evalId = evalId;
 
     try {
       // 2. Generate scenarios
@@ -256,7 +256,7 @@ export const runEvaluation = createServerFn({ method: "POST" })
       // Insert pending rows
       await supabaseAdmin.from("scenarios").insert(
         scenarios.map((s, i) => ({
-          evaluation_id: evalRow.id,
+          evaluation_id: evalId,
           idx: i,
           category: s.category,
           user_goal: s.user_goal,
@@ -265,7 +265,7 @@ export const runEvaluation = createServerFn({ method: "POST" })
         })),
       );
 
-      await supabaseAdmin.from("evaluations").update({ status: "running" }).eq("id", evalRow.id);
+      await supabaseAdmin.from("evaluations").update({ status: "running" }).eq("id", evalId);
 
       // 3. Run scenarios with limited concurrency
       const concurrency = 6;
@@ -295,21 +295,21 @@ export const runEvaluation = createServerFn({ method: "POST" })
                 notes: r.notes,
                 status: "done",
               })
-              .eq("evaluation_id", evalRow.id)
+              .eq("evaluation_id", evalId)
               .eq("idx", i);
           } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
             await supabaseAdmin
               .from("scenarios")
               .update({ status: "error", notes: msg })
-              .eq("evaluation_id", evalRow.id)
+              .eq("evaluation_id", evalId)
               .eq("idx", i);
           } finally {
             completed++;
             await supabaseAdmin
               .from("evaluations")
               .update({ completed_count: completed })
-              .eq("id", evalRow.id);
+              .eq("id", evalId);
           }
         }
       }
@@ -404,15 +404,15 @@ ${failedSample || "(none)"}
           summary: { ...summary, passRate },
           updated_at: new Date().toISOString(),
         })
-        .eq("id", evalRow.id);
+        .eq("id", evalId);
 
-      return { evaluationId: evalRow.id };
+      return { evaluationId: evalId };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       await supabaseAdmin
         .from("evaluations")
         .update({ status: "error", error: msg })
-        .eq("id", evalRow.id);
+        .eq("id", evalId);
       throw err;
     }
   });
