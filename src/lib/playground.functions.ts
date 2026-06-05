@@ -247,6 +247,7 @@ export const runEvaluation = createServerFn({ method: "POST" })
       .select()
       .single();
     if (evalErr || !evalRow) throw new Error(evalErr?.message || "Failed to create evaluation");
+    const evalId = evalRow.id;
 
     try {
       // 2. Generate scenarios
