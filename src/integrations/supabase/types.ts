@@ -14,7 +14,151 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      evaluations: {
+        Row: {
+          agent_type: string
+          completed_count: number
+          created_at: string
+          effectiveness_score: number | null
+          error: string | null
+          hallucination_risk: number | null
+          id: string
+          model: string
+          prompt_id: string | null
+          prompt_snapshot: string
+          scenario_count: number
+          status: string
+          summary: Json | null
+          updated_at: string
+        }
+        Insert: {
+          agent_type: string
+          completed_count?: number
+          created_at?: string
+          effectiveness_score?: number | null
+          error?: string | null
+          hallucination_risk?: number | null
+          id?: string
+          model: string
+          prompt_id?: string | null
+          prompt_snapshot: string
+          scenario_count?: number
+          status?: string
+          summary?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          agent_type?: string
+          completed_count?: number
+          created_at?: string
+          effectiveness_score?: number | null
+          error?: string | null
+          hallucination_risk?: number | null
+          id?: string
+          model?: string
+          prompt_id?: string | null
+          prompt_snapshot?: string
+          scenario_count?: number
+          status?: string
+          summary?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evaluations_prompt_id_fkey"
+            columns: ["prompt_id"]
+            isOneToOne: false
+            referencedRelation: "prompts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prompts: {
+        Row: {
+          agent_type: string
+          created_at: string
+          id: string
+          model: string
+          name: string
+          system_prompt: string
+          updated_at: string
+        }
+        Insert: {
+          agent_type?: string
+          created_at?: string
+          id?: string
+          model?: string
+          name?: string
+          system_prompt?: string
+          updated_at?: string
+        }
+        Update: {
+          agent_type?: string
+          created_at?: string
+          id?: string
+          model?: string
+          name?: string
+          system_prompt?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      scenarios: {
+        Row: {
+          category: string | null
+          conversation: Json | null
+          created_at: string
+          effectiveness: number | null
+          evaluation_id: string
+          expected_behavior: string | null
+          hallucination: number | null
+          id: string
+          idx: number
+          notes: string | null
+          passed: boolean | null
+          status: string
+          user_goal: string
+        }
+        Insert: {
+          category?: string | null
+          conversation?: Json | null
+          created_at?: string
+          effectiveness?: number | null
+          evaluation_id: string
+          expected_behavior?: string | null
+          hallucination?: number | null
+          id?: string
+          idx: number
+          notes?: string | null
+          passed?: boolean | null
+          status?: string
+          user_goal: string
+        }
+        Update: {
+          category?: string | null
+          conversation?: Json | null
+          created_at?: string
+          effectiveness?: number | null
+          evaluation_id?: string
+          expected_behavior?: string | null
+          hallucination?: number | null
+          id?: string
+          idx?: number
+          notes?: string | null
+          passed?: boolean | null
+          status?: string
+          user_goal?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scenarios_evaluation_id_fkey"
+            columns: ["evaluation_id"]
+            isOneToOne: false
+            referencedRelation: "evaluations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
