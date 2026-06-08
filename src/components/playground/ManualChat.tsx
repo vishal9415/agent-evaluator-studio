@@ -114,7 +114,7 @@ export function ManualChat({ systemPrompt, model, agentType }: Props) {
       return;
     }
     const rec = new SR();
-    rec.lang = "en-US";
+    rec.lang = "en-IN";
     rec.interimResults = false;
     rec.continuous = false;
     rec.onresult = (ev: any) => {
