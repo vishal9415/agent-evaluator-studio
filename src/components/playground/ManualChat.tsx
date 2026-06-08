@@ -93,6 +93,8 @@ export function ManualChat({ systemPrompt, model, agentType }: Props) {
       if (speakOutput && typeof window !== "undefined" && "speechSynthesis" in window) {
         const utter = new SpeechSynthesisUtterance(reply);
         utter.rate = 1.05;
+        const iv = getIndianFemaleVoice();
+        if (iv) utter.voice = iv;
         window.speechSynthesis.cancel();
         window.speechSynthesis.speak(utter);
       }
