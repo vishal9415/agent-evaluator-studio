@@ -141,6 +141,9 @@ export function ManualChat({ systemPrompt, model, agentType }: Props) {
       <div className="flex items-center justify-between border-b px-4 py-2">
         <div className="text-sm text-muted-foreground">
           Manual chat · <span className="font-mono">{model}</span>
+          {indianVoiceName && speakOutput && (
+            <span className="ml-2 text-xs text-emerald-600">♪ {indianVoiceName}</span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Button
