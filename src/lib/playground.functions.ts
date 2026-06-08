@@ -416,3 +416,49 @@ ${failedSample || "(none)"}
       throw err;
     }
   });
+
+/** ElevenLabs TTS — natural human-like voice. */
+export const synthesizeSpeech = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z
+      .object({
+        text: z.string().min(1).max(5000),
+        voiceId: z.string().min(1).max(64),
+        modelId: z.string().min(1).max(64).optional(),
+        stability: z.number().min(0).max(1).optional(),
+        similarityBoost: z.number().min(0).max(1).optional(),
+        style: z.number().min(0).max(1).optional(),
+        speed: z.number().min(0.7).max(1.2).optional(),
+        useSpeakerBoost: z.boolean().optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const apiKey = process.env.ELEVENLABS_API_KEY;
+    if (!apiKey) throw new Error("ElevenLabs is not connected to this project");
+    const res = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${data.voiceId}?output_format=mp3_44100_128`,
+      {
+        method: "POST",
+        headers: { "xi-api-key": apiKey, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: data.text,
+          model_id: data.modelId ?? "eleven_turbo_v2_5",
+          voice_settings: {
+            stability: data.stability ?? 0.4,
+            similarity_boost: data.similarityBoost ?? 0.8,
+            style: data.style ?? 0.3,
+            use_speaker_boost: data.useSpeakerBoost ?? true,
+            speed: data.speed ?? 1.0,
+          },
+        }),
+      },
+    );
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`ElevenLabs error ${res.status}: ${txt.slice(0, 300)}`);
+    }
+    const buf = await res.arrayBuffer();
+    const audio = Buffer.from(buf).toString("base64");
+    return { audio, mime: "audio/mpeg" };
+  });

@@ -10,7 +10,7 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { chatCompletion } from "@/lib/playground.functions";
+import { chatCompletion, synthesizeSpeech } from "@/lib/playground.functions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -27,21 +27,27 @@ type AnyWindow = Window & {
   SpeechRecognition?: new () => any;
 };
 
-const INDIAN_FEMALE_NAMES = [
-  "kalpana", "priya", "heera", "shruti", "swara", "kavya", "meera", "neeta", "rekha", "sunita",
+// Curated ElevenLabs voices (natural, human-like)
+const ELEVEN_VOICES = [
+  { id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah", desc: "Warm female, conversational" },
+  { id: "FGY2WhTYpPnrIDTdsKH5", name: "Laura", desc: "Friendly female" },
+  { id: "Xb7hH8MSUJpSbSDYk0k2", name: "Alice", desc: "British female, calm" },
+  { id: "XrExE9yKIg1WjnnlVkGX", name: "Matilda", desc: "Mature female, narration" },
+  { id: "cgSgspJ2msm6clMCkdW9", name: "Jessica", desc: "Young female, expressive" },
+  { id: "pFZP5JQG7iQjIQuC4Bku", name: "Lily", desc: "Soft female" },
+  { id: "JBFqnCBsd6RMkjVDRZzb", name: "George", desc: "Mature male, British" },
+  { id: "CwhRBWXzGAHq8TQ4Fs17", name: "Roger", desc: "American male, confident" },
+  { id: "IKne3meq5aSn9XLyUdCD", name: "Charlie", desc: "Australian male, casual" },
+  { id: "TX3LPaxmHKxFdv7VOQHJ", name: "Liam", desc: "Young male, energetic" },
+  { id: "iP95p4xoKVk53GoZ742B", name: "Chris", desc: "Conversational male" },
+  { id: "nPczCjzI2devNBz1zQrb", name: "Brian", desc: "Deep male, narration" },
 ];
 
-function pickDefaultVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined {
-  for (const name of INDIAN_FEMALE_NAMES) {
-    const v = voices.find((voice) => voice.lang.toLowerCase().endsWith("-in") && voice.name.toLowerCase().includes(name));
-    if (v) return v;
-  }
-  const female = voices.find((voice) => voice.lang.toLowerCase().endsWith("-in") && voice.name.toLowerCase().includes("female"));
-  if (female) return female;
-  const anyIn = voices.find((voice) => voice.lang.toLowerCase().endsWith("-in"));
-  if (anyIn) return anyIn;
-  return voices[0];
-}
+const ELEVEN_MODELS = [
+  { id: "eleven_turbo_v2_5", name: "Turbo v2.5 (low latency)" },
+  { id: "eleven_multilingual_v2", name: "Multilingual v2 (highest quality)" },
+  { id: "eleven_turbo_v2", name: "Turbo v2 (fast)" },
+];
 
 const RECOG_LANGS = [
   { v: "en-IN", label: "English (India)" },
@@ -61,44 +67,30 @@ export function ManualChat({ systemPrompt, model, agentType }: Props) {
   const [listening, setListening] = useState(false);
   const [speakOutput, setSpeakOutput] = useState(agentType === "voice");
 
-  // Voice playback settings
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [voiceURI, setVoiceURI] = useState<string>("");
-  const [rate, setRate] = useState(1.05);
-  const [pitch, setPitch] = useState(1);
-  const [volume, setVolume] = useState(1);
+  // ElevenLabs voice settings
+  const [voiceId, setVoiceId] = useState(ELEVEN_VOICES[0].id);
+  const [ttsModel, setTtsModel] = useState(ELEVEN_MODELS[0].id);
+  const [speed, setSpeed] = useState(1.0);
+  const [stability, setStability] = useState(0.4);
+  const [similarity, setSimilarity] = useState(0.8);
+  const [style, setStyle] = useState(0.3);
+  const [speakerBoost, setSpeakerBoost] = useState(true);
 
   // VAD / recognition settings
-  const [recogLang, setRecogLang] = useState("en-IN");
+  const [recogLang, setRecogLang] = useState("en-US");
   const [continuous, setContinuous] = useState(false);
   const [interim, setInterim] = useState(true);
-  const [silenceMs, setSilenceMs] = useState(1200); // VAD: silence before auto-stop
+  const [silenceMs, setSilenceMs] = useState(1200);
   const [minSpeechChars, setMinSpeechChars] = useState(2);
   const [autoSend, setAutoSend] = useState(true);
 
   const chat = useServerFn(chatCompletion);
+  const tts = useServerFn(synthesizeSpeech);
   const endRef = useRef<HTMLDivElement>(null);
   const recRef = useRef<any>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const silenceTimer = useRef<number | null>(null);
   const lastTranscript = useRef<string>("");
-
-  const refreshVoices = useCallback(() => {
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
-    const list = window.speechSynthesis.getVoices();
-    setVoices(list);
-    setVoiceURI((cur) => {
-      if (cur && list.some((v) => v.voiceURI === cur)) return cur;
-      return pickDefaultVoice(list)?.voiceURI ?? "";
-    });
-  }, []);
-
-  useEffect(() => {
-    refreshVoices();
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      window.speechSynthesis.onvoiceschanged = refreshVoices;
-      return () => { window.speechSynthesis.onvoiceschanged = null; };
-    }
-  }, [refreshVoices]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -109,17 +101,35 @@ export function ManualChat({ systemPrompt, model, agentType }: Props) {
     setSpeakOutput(agentType === "voice");
   }, [agentType]);
 
-  const speak = (text: string) => {
-    if (!speakOutput || typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.rate = rate;
-    utter.pitch = pitch;
-    utter.volume = volume;
-    const v = voices.find((x) => x.voiceURI === voiceURI);
-    if (v) utter.voice = v;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utter);
-  };
+  const speak = useCallback(
+    async (text: string) => {
+      if (!speakOutput) return;
+      try {
+        const res = await tts({
+          data: {
+            text,
+            voiceId,
+            modelId: ttsModel,
+            speed,
+            stability,
+            similarityBoost: similarity,
+            style,
+            useSpeakerBoost: speakerBoost,
+          },
+        });
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.src = "";
+        }
+        const audio = new Audio(`data:${res.mime};base64,${res.audio}`);
+        audioRef.current = audio;
+        await audio.play();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "TTS failed");
+      }
+    },
+    [speakOutput, tts, voiceId, ttsModel, speed, stability, similarity, style, speakerBoost],
+  );
 
   const send = async (text: string) => {
     const trimmed = text.trim();
@@ -132,7 +142,7 @@ export function ManualChat({ systemPrompt, model, agentType }: Props) {
       const res = await chat({ data: { model, systemPrompt, messages: next } });
       const reply = res.content || "(empty response)";
       setMessages([...next, { role: "assistant", content: reply }]);
-      speak(reply);
+      void speak(reply);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Chat failed");
       setMessages(messages);
@@ -169,7 +179,6 @@ export function ManualChat({ systemPrompt, model, agentType }: Props) {
       lastTranscript.current = transcript;
       setInput(transcript);
 
-      // VAD: reset silence timer on any speech result
       clearSilence();
       silenceTimer.current = window.setTimeout(() => {
         if (transcript.length >= minSpeechChars) {
@@ -179,15 +188,9 @@ export function ManualChat({ systemPrompt, model, agentType }: Props) {
       }, silenceMs);
     };
     rec.onerror = () => { clearSilence(); setListening(false); };
-    rec.onend = () => {
-      clearSilence();
-      setListening(false);
-      if (autoSend && lastTranscript.current.length >= minSpeechChars && !continuous) {
-        // Already handled by silence timer typically; this is a fallback
-      }
-    };
+    rec.onend = () => { clearSilence(); setListening(false); };
     recRef.current = rec;
-    try { rec.start(); setListening(true); } catch (e) {
+    try { rec.start(); setListening(true); } catch {
       toast.error("Could not start mic");
     }
   };
@@ -201,7 +204,7 @@ export function ManualChat({ systemPrompt, model, agentType }: Props) {
     }
   };
 
-  const selectedVoice = voices.find((v) => v.voiceURI === voiceURI);
+  const selectedVoice = ELEVEN_VOICES.find((v) => v.id === voiceId);
 
   return (
     <div className="flex h-[600px] flex-col rounded-lg border bg-card">
@@ -219,17 +222,29 @@ export function ManualChat({ systemPrompt, model, agentType }: Props) {
                 <Settings2 className="h-4 w-4" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="w-[340px] max-h-[520px] overflow-y-auto">
+            <PopoverContent align="end" className="w-[360px] max-h-[560px] overflow-y-auto">
               <div className="space-y-4">
                 <div>
-                  <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">TTS Voice</div>
-                  <Select value={voiceURI} onValueChange={setVoiceURI}>
-                    <SelectTrigger><SelectValue placeholder="Select voice" /></SelectTrigger>
+                  <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Voice (ElevenLabs)</div>
+                  <Select value={voiceId} onValueChange={setVoiceId}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent className="max-h-[260px]">
-                      {voices.map((v) => (
-                        <SelectItem key={v.voiceURI} value={v.voiceURI}>
-                          {v.name} <span className="text-xs text-muted-foreground">({v.lang})</span>
+                      {ELEVEN_VOICES.map((v) => (
+                        <SelectItem key={v.id} value={v.id}>
+                          {v.name} <span className="text-xs text-muted-foreground">— {v.desc}</span>
                         </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="text-xs">Model</Label>
+                  <Select value={ttsModel} onValueChange={setTtsModel}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {ELEVEN_MODELS.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -237,18 +252,24 @@ export function ManualChat({ systemPrompt, model, agentType }: Props) {
 
                 <div className="space-y-3">
                   <div>
-                    <div className="flex justify-between text-xs"><Label>Pace (rate)</Label><span className="text-muted-foreground">{rate.toFixed(2)}x</span></div>
-                    <Slider value={[rate]} min={0.5} max={2} step={0.05} onValueChange={(v) => setRate(v[0])} />
+                    <div className="flex justify-between text-xs"><Label>Pace (speed)</Label><span className="text-muted-foreground">{speed.toFixed(2)}x</span></div>
+                    <Slider value={[speed]} min={0.7} max={1.2} step={0.05} onValueChange={(v) => setSpeed(v[0])} />
                   </div>
                   <div>
-                    <div className="flex justify-between text-xs"><Label>Pitch</Label><span className="text-muted-foreground">{pitch.toFixed(2)}</span></div>
-                    <Slider value={[pitch]} min={0} max={2} step={0.05} onValueChange={(v) => setPitch(v[0])} />
+                    <div className="flex justify-between text-xs"><Label>Stability</Label><span className="text-muted-foreground">{stability.toFixed(2)}</span></div>
+                    <Slider value={[stability]} min={0} max={1} step={0.05} onValueChange={(v) => setStability(v[0])} />
+                    <p className="mt-1 text-[10px] text-muted-foreground">Lower = more expressive, higher = more consistent</p>
                   </div>
                   <div>
-                    <div className="flex justify-between text-xs"><Label>Volume</Label><span className="text-muted-foreground">{Math.round(volume * 100)}%</span></div>
-                    <Slider value={[volume]} min={0} max={1} step={0.05} onValueChange={(v) => setVolume(v[0])} />
+                    <div className="flex justify-between text-xs"><Label>Similarity boost</Label><span className="text-muted-foreground">{similarity.toFixed(2)}</span></div>
+                    <Slider value={[similarity]} min={0} max={1} step={0.05} onValueChange={(v) => setSimilarity(v[0])} />
                   </div>
-                  <Button size="sm" variant="outline" className="w-full" onClick={() => speak("This is a preview of the selected voice and pace.")}>
+                  <div>
+                    <div className="flex justify-between text-xs"><Label>Style</Label><span className="text-muted-foreground">{style.toFixed(2)}</span></div>
+                    <Slider value={[style]} min={0} max={1} step={0.05} onValueChange={(v) => setStyle(v[0])} />
+                  </div>
+                  <div className="flex items-center justify-between"><Label className="text-xs">Speaker boost</Label><Switch checked={speakerBoost} onCheckedChange={setSpeakerBoost} /></div>
+                  <Button size="sm" variant="outline" className="w-full" onClick={() => speak("Hi! This is a preview of the selected voice, pace, and style.")}>
                     Preview voice
                   </Button>
                 </div>
