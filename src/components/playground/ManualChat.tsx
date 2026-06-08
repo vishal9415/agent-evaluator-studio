@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Mic, MicOff, Send, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,27 @@ type AnyWindow = Window & {
   SpeechRecognition?: new () => any;
 };
 
+const INDIAN_FEMALE_NAMES = [
+  "kalpana", "priya", "heera", "shruti", "swara", "kavya", "meera", "neeta", "rekha", "sunita",
+];
+
+function getIndianFemaleVoice(): SpeechSynthesisVoice | undefined {
+  if (typeof window === "undefined" || !window.speechSynthesis) return undefined;
+  const voices = window.speechSynthesis.getVoices();
+  // Prefer exact Indian female names
+  for (const name of INDIAN_FEMALE_NAMES) {
+    const v = voices.find((voice) => voice.lang.toLowerCase().endsWith("-in") && voice.name.toLowerCase().includes(name));
+    if (v) return v;
+  }
+  // Fallback: any Indian lang voice with "female" in name
+  const female = voices.find((voice) => voice.lang.toLowerCase().endsWith("-in") && voice.name.toLowerCase().includes("female"));
+  if (female) return female;
+  // Fallback: any Indian voice
+  const anyIn = voices.find((voice) => voice.lang.toLowerCase().endsWith("-in"));
+  if (anyIn) return anyIn;
+  return undefined;
+}
+
 export function ManualChat({ systemPrompt, model, agentType }: Props) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -29,9 +50,25 @@ export function ManualChat({ systemPrompt, model, agentType }: Props) {
   const [voice, setVoice] = useState(agentType === "voice");
   const [listening, setListening] = useState(false);
   const [speakOutput, setSpeakOutput] = useState(agentType === "voice");
+  const [indianVoiceName, setIndianVoiceName] = useState<string>("");
   const chat = useServerFn(chatCompletion);
   const endRef = useRef<HTMLDivElement>(null);
   const recRef = useRef<any>(null);
+
+  const refreshVoice = useCallback(() => {
+    const v = getIndianFemaleVoice();
+    setIndianVoiceName(v?.name ?? "");
+  }, []);
+
+  useEffect(() => {
+    refreshVoice();
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = refreshVoice;
+      return () => {
+        window.speechSynthesis.onvoiceschanged = null;
+      };
+    }
+  }, [refreshVoice]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -56,6 +93,8 @@ export function ManualChat({ systemPrompt, model, agentType }: Props) {
       if (speakOutput && typeof window !== "undefined" && "speechSynthesis" in window) {
         const utter = new SpeechSynthesisUtterance(reply);
         utter.rate = 1.05;
+        const iv = getIndianFemaleVoice();
+        if (iv) utter.voice = iv;
         window.speechSynthesis.cancel();
         window.speechSynthesis.speak(utter);
       }
@@ -75,7 +114,7 @@ export function ManualChat({ systemPrompt, model, agentType }: Props) {
       return;
     }
     const rec = new SR();
-    rec.lang = "en-US";
+    rec.lang = "en-IN";
     rec.interimResults = false;
     rec.continuous = false;
     rec.onresult = (ev: any) => {
@@ -102,6 +141,9 @@ export function ManualChat({ systemPrompt, model, agentType }: Props) {
       <div className="flex items-center justify-between border-b px-4 py-2">
         <div className="text-sm text-muted-foreground">
           Manual chat · <span className="font-mono">{model}</span>
+          {indianVoiceName && speakOutput && (
+            <span className="ml-2 text-xs text-emerald-600">♪ {indianVoiceName}</span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Button
