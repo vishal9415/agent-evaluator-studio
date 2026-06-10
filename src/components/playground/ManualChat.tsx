@@ -84,6 +84,8 @@ export function ManualChat({ systemPrompt, model, agentType }: Props) {
   const [minSpeechChars, setMinSpeechChars] = useState(2);
   const [autoSend, setAutoSend] = useState(true);
 
+  const [ttsFallback, setTtsFallback] = useState(false);
+
   const chat = useServerFn(chatCompletion);
   const tts = useServerFn(synthesizeSpeech);
   const endRef = useRef<HTMLDivElement>(null);
@@ -101,9 +103,29 @@ export function ManualChat({ systemPrompt, model, agentType }: Props) {
     setSpeakOutput(agentType === "voice");
   }, [agentType]);
 
+  const speakBrowser = useCallback((text: string) => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = recogLang || "en-US";
+    u.rate = speed;
+    const voices = window.speechSynthesis.getVoices();
+    const base = u.lang.split("-")[0];
+    const preferred =
+      voices.find((v) => /female|samantha|zira|google.*female|aditi|raveena/i.test(v.name) && v.lang.startsWith(base)) ||
+      voices.find((v) => v.lang === u.lang) ||
+      voices.find((v) => v.lang.startsWith(base));
+    if (preferred) u.voice = preferred;
+    window.speechSynthesis.speak(u);
+  }, [recogLang, speed]);
+
   const speak = useCallback(
     async (text: string) => {
       if (!speakOutput) return;
+      if (ttsFallback) {
+        speakBrowser(text);
+        return;
+      }
       try {
         const res = await tts({
           data: {
@@ -125,10 +147,13 @@ export function ManualChat({ systemPrompt, model, agentType }: Props) {
         audioRef.current = audio;
         await audio.play();
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : "TTS failed");
+        const msg = e instanceof Error ? e.message : "TTS failed";
+        toast.warning(`Premium voice unavailable — using browser voice. (${msg.slice(0, 100)})`);
+        setTtsFallback(true);
+        speakBrowser(text);
       }
     },
-    [speakOutput, tts, voiceId, ttsModel, speed, stability, similarity, style, speakerBoost],
+    [speakOutput, ttsFallback, speakBrowser, tts, voiceId, ttsModel, speed, stability, similarity, style, speakerBoost],
   );
 
   const send = async (text: string) => {
