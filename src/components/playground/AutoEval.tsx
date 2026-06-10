@@ -76,7 +76,7 @@ export function AutoEval({ systemPrompt, model, agentType, promptId, onApplyImpr
     };
   }, [activeEvalId]);
 
-  const start = async () => {
+  const start = async (count: number) => {
     if (!systemPrompt.trim()) {
       toast.error("Add a system prompt first.");
       return;
@@ -87,7 +87,7 @@ export function AutoEval({ systemPrompt, model, agentType, promptId, onApplyImpr
     setExpanded(new Set());
     try {
       const res = await run({
-        data: { systemPrompt, model, agentType, promptId, scenarioCount: 50 },
+        data: { systemPrompt, model, agentType, promptId, scenarioCount: count },
       });
       setActiveEvalId(res.evaluationId);
       qc.invalidateQueries({ queryKey: ["evaluations"] });
@@ -130,23 +130,38 @@ export function AutoEval({ systemPrompt, model, agentType, promptId, onApplyImpr
           <div>
             <CardTitle className="text-base">Automatic evaluation</CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
-              Generate 50 diverse scenarios, run them against your prompt, and get effectiveness +
+              Generate scenarios, run them against your prompt, and get effectiveness +
               hallucination scores plus an improved prompt suggestion.
             </p>
           </div>
-          <Button onClick={start} disabled={!!running}>
-            {running ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Running…
-              </>
-            ) : (
-              <>
-                <Play className="mr-2 h-4 w-4" />
-                Run 50 scenarios
-              </>
-            )}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => start(10)} disabled={!!running} variant="outline">
+              {running && evalRow?.scenario_count === 10 ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Running…
+                </>
+              ) : (
+                <>
+                  <Play className="mr-2 h-4 w-4" />
+                  Run 10
+                </>
+              )}
+            </Button>
+            <Button onClick={() => start(50)} disabled={!!running}>
+              {running && evalRow?.scenario_count === 50 ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Running…
+                </>
+              ) : (
+                <>
+                  <Play className="mr-2 h-4 w-4" />
+                  Run 50
+                </>
+              )}
+            </Button>
+          </div>
         </CardHeader>
         {evalRow && (
           <CardContent className="space-y-3">
