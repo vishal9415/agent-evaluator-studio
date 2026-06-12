@@ -8,7 +8,7 @@ type Msg = { role: "system" | "user" | "assistant"; content: string };
 // Global serialization gate: ensure a minimum spacing between gateway calls
 // across all concurrent workers in the same server invocation.
 let lastCallAt = 0;
-const MIN_SPACING_MS = 350;
+const MIN_SPACING_MS = 1500;
 async function acquireSlot() {
   const now = Date.now();
   const wait = Math.max(0, lastCallAt + MIN_SPACING_MS - now);
@@ -30,18 +30,18 @@ async function callGateway(body: Record<string, unknown>, attempt = 0): Promise<
   });
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
-    if (res.status === 429 && attempt < 8) {
+    if (res.status === 429 && attempt < 10) {
       // Honor Retry-After when present, otherwise exponential backoff with jitter.
       const retryAfter = Number(res.headers.get("retry-after"));
       const backoff = Number.isFinite(retryAfter) && retryAfter > 0
         ? retryAfter * 1000
-        : Math.min(30000, 1500 * 2 ** attempt) + Math.floor(Math.random() * 750);
+        : Math.min(60000, 3000 * 2 ** attempt) + Math.floor(Math.random() * 1500);
       // Push the global gate forward so other workers also back off.
       lastCallAt = Math.max(lastCallAt, Date.now() + backoff);
       await new Promise((r) => setTimeout(r, backoff));
       return callGateway(body, attempt + 1);
     }
-    if (res.status === 429) throw new Error("Rate limited. Please slow down and retry.");
+    if (res.status === 429) throw new Error("The AI gateway is still busy after waiting. Please retry in about a minute.");
     if (res.status === 402) throw new Error("AI credits exhausted. Add credits to your Lovable workspace.");
     throw new Error(`AI gateway error ${res.status}: ${txt.slice(0, 300)}`);
   }
@@ -291,7 +291,7 @@ export const runEvaluation = createServerFn({ method: "POST" })
       await supabaseAdmin.from("evaluations").update({ status: "running" }).eq("id", evalId);
 
       // 3. Run scenarios with limited concurrency
-      const concurrency = 2;
+      const concurrency = 1;
       let cursor = 0;
       let completed = 0;
       const results: Array<{
