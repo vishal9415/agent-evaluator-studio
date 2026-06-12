@@ -135,6 +135,19 @@ export function AutoEval({ systemPrompt, model, agentType, promptId, onApplyImpr
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Button onClick={() => start(5)} disabled={!!running} variant="outline" size="sm">
+              {running && evalRow?.scenario_count === 5 ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Running…
+                </>
+              ) : (
+                <>
+                  <Play className="mr-2 h-4 w-4" />
+                  Run 5
+                </>
+              )}
+            </Button>
             <Button onClick={() => start(10)} disabled={!!running} variant="outline">
               {running && evalRow?.scenario_count === 10 ? (
                 <>
