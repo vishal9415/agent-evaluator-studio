@@ -277,7 +277,7 @@ export const runEvaluation = createServerFn({ method: "POST" })
       await supabaseAdmin.from("evaluations").update({ status: "running" }).eq("id", evalId);
 
       // 3. Run scenarios with limited concurrency
-      const concurrency = 6;
+      const concurrency = 3;
       let cursor = 0;
       let completed = 0;
       const results: Array<{
