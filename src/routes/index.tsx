@@ -220,7 +220,7 @@ function Playground() {
           <Tabs defaultValue="manual">
             <TabsList>
               <TabsTrigger value="manual">Manual testing</TabsTrigger>
-              <TabsTrigger value="auto">Auto-eval (50 scenarios)</TabsTrigger>
+              <TabsTrigger value="auto">Auto-eval</TabsTrigger>
             </TabsList>
             <TabsContent value="manual" className="mt-4">
               <ManualChat
