@@ -5,7 +5,7 @@ const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
 type Msg = { role: "system" | "user" | "assistant"; content: string };
 
-async function callGateway(body: Record<string, unknown>) {
+async function callGateway(body: Record<string, unknown>, attempt = 0): Promise<any> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured");
   const res = await fetch(GATEWAY_URL, {
@@ -18,6 +18,15 @@ async function callGateway(body: Record<string, unknown>) {
   });
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
+    if (res.status === 429 && attempt < 5) {
+      // Honor Retry-After when present, otherwise exponential backoff with jitter.
+      const retryAfter = Number(res.headers.get("retry-after"));
+      const backoff = Number.isFinite(retryAfter) && retryAfter > 0
+        ? retryAfter * 1000
+        : Math.min(16000, 1000 * 2 ** attempt) + Math.floor(Math.random() * 500);
+      await new Promise((r) => setTimeout(r, backoff));
+      return callGateway(body, attempt + 1);
+    }
     if (res.status === 429) throw new Error("Rate limited. Please slow down and retry.");
     if (res.status === 402) throw new Error("AI credits exhausted. Add credits to your Lovable workspace.");
     throw new Error(`AI gateway error ${res.status}: ${txt.slice(0, 300)}`);
@@ -268,7 +277,7 @@ export const runEvaluation = createServerFn({ method: "POST" })
       await supabaseAdmin.from("evaluations").update({ status: "running" }).eq("id", evalId);
 
       // 3. Run scenarios with limited concurrency
-      const concurrency = 6;
+      const concurrency = 3;
       let cursor = 0;
       let completed = 0;
       const results: Array<{
