@@ -5,9 +5,21 @@ const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
 type Msg = { role: "system" | "user" | "assistant"; content: string };
 
+// Global serialization gate: ensure a minimum spacing between gateway calls
+// across all concurrent workers in the same server invocation.
+let lastCallAt = 0;
+const MIN_SPACING_MS = 350;
+async function acquireSlot() {
+  const now = Date.now();
+  const wait = Math.max(0, lastCallAt + MIN_SPACING_MS - now);
+  lastCallAt = now + wait;
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+}
+
 async function callGateway(body: Record<string, unknown>, attempt = 0): Promise<any> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured");
+  await acquireSlot();
   const res = await fetch(GATEWAY_URL, {
     method: "POST",
     headers: {
@@ -18,12 +30,14 @@ async function callGateway(body: Record<string, unknown>, attempt = 0): Promise<
   });
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
-    if (res.status === 429 && attempt < 5) {
+    if (res.status === 429 && attempt < 8) {
       // Honor Retry-After when present, otherwise exponential backoff with jitter.
       const retryAfter = Number(res.headers.get("retry-after"));
       const backoff = Number.isFinite(retryAfter) && retryAfter > 0
         ? retryAfter * 1000
-        : Math.min(16000, 1000 * 2 ** attempt) + Math.floor(Math.random() * 500);
+        : Math.min(30000, 1500 * 2 ** attempt) + Math.floor(Math.random() * 750);
+      // Push the global gate forward so other workers also back off.
+      lastCallAt = Math.max(lastCallAt, Date.now() + backoff);
       await new Promise((r) => setTimeout(r, backoff));
       return callGateway(body, attempt + 1);
     }
