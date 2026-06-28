@@ -121,29 +121,43 @@ function Playground() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-b from-muted/40 via-background to-background">
       <Toaster richColors position="top-right" />
-      <header className="border-b">
-        <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
-          <Sparkles className="h-5 w-5 text-primary" />
-          <h1 className="text-lg font-semibold">Agent Playground</h1>
-          <span className="text-sm text-muted-foreground">
-            — test conversational prompts manually or with 50 auto-generated scenarios
-          </span>
+      <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+              <Sparkles className="h-4 w-4" />
+            </div>
+            <div>
+              <h1 className="text-base font-semibold leading-tight tracking-tight">
+                Agent Playground
+              </h1>
+              <p className="text-xs text-muted-foreground">
+                Test conversational prompts — manually or with auto-generated scenarios
+              </p>
+            </div>
+          </div>
+          <div className="hidden items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs text-muted-foreground md:flex">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            Ready
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-7xl grid-cols-1 gap-4 p-4 lg:grid-cols-[420px_1fr]">
+      <main className="mx-auto grid max-w-7xl grid-cols-1 gap-6 p-6 lg:grid-cols-[440px_1fr]">
         {/* Left: configuration */}
-        <Card className="self-start">
-          <CardHeader>
-            <CardTitle className="text-base">Configuration</CardTitle>
+        <Card className="self-start border-border/60 shadow-sm">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-sm font-semibold">Configuration</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-5">
             <div className="space-y-1.5">
-              <Label>Saved prompts</Label>
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Saved prompts
+              </Label>
               <Select value={promptId ?? "__new__"} onValueChange={loadPrompt}>
-                <SelectTrigger>
+                <SelectTrigger className="h-10 rounded-lg">
                   <SelectValue placeholder="New prompt" />
                 </SelectTrigger>
                 <SelectContent>
@@ -158,15 +172,27 @@ function Playground() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="name">Name</Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
+              <Label
+                htmlFor="name"
+                className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+              >
+                Name
+              </Label>
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="h-10 rounded-lg"
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Model</Label>
+                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Model
+                </Label>
                 <Select value={model} onValueChange={setModel}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-10 rounded-lg">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -179,9 +205,11 @@ function Playground() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Agent type</Label>
+                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Agent type
+                </Label>
                 <Select value={agentType} onValueChange={setAgentType}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-10 rounded-lg">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -196,19 +224,26 @@ function Playground() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="prompt">System prompt</Label>
+              <div className="flex items-center justify-between">
+                <Label
+                  htmlFor="prompt"
+                  className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+                >
+                  System prompt
+                </Label>
+                <span className="font-mono text-[10px] text-muted-foreground">
+                  {systemPrompt.length} chars
+                </span>
+              </div>
               <Textarea
                 id="prompt"
                 value={systemPrompt}
                 onChange={(e) => setSystemPrompt(e.target.value)}
-                className="min-h-[280px] font-mono text-xs"
+                className="min-h-[300px] resize-none rounded-xl bg-muted/30 font-mono text-xs leading-relaxed"
               />
-              <p className="text-xs text-muted-foreground">
-                {systemPrompt.length} chars
-              </p>
             </div>
 
-            <Button onClick={savePrompt} disabled={saving} className="w-full">
+            <Button onClick={savePrompt} disabled={saving} className="h-10 w-full rounded-lg">
               <Save className="mr-2 h-4 w-4" />
               {promptId ? "Update prompt" : "Save prompt"}
             </Button>
@@ -218,9 +253,13 @@ function Playground() {
         {/* Right: testing surfaces */}
         <div>
           <Tabs defaultValue="manual">
-            <TabsList>
-              <TabsTrigger value="manual">Manual testing</TabsTrigger>
-              <TabsTrigger value="auto">Auto-eval</TabsTrigger>
+            <TabsList className="h-10 rounded-xl bg-muted/60 p-1">
+              <TabsTrigger value="manual" className="rounded-lg px-4 text-xs font-medium">
+                Manual testing
+              </TabsTrigger>
+              <TabsTrigger value="auto" className="rounded-lg px-4 text-xs font-medium">
+                Auto-eval
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="manual" className="mt-4">
               <ManualChat
@@ -245,3 +284,4 @@ function Playground() {
     </div>
   );
 }
+
