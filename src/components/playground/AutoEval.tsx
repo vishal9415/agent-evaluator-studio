@@ -123,69 +123,116 @@ export function AutoEval({ systemPrompt, model, agentType, promptId, onApplyImpr
     | null
     | undefined;
 
+  const currentScenario = scenarios.find((s) => s.status === "running") ??
+    (running ? scenarios.find((s) => s.status === "pending") : undefined);
+  const passedCount = scenarios.filter((s) => s.status === "done" && s.passed).length;
+  const failedCount = scenarios.filter((s) => s.status === "done" && s.passed === false).length;
+
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+      <Card className="overflow-hidden border-border/60 shadow-sm">
+        <CardHeader className="flex flex-row items-start justify-between space-y-0 gap-4 pb-4">
           <div>
-            <CardTitle className="text-base">Automatic evaluation</CardTitle>
+            <CardTitle className="text-sm font-semibold">Automatic evaluation</CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
-              Generate scenarios, run them against your prompt, and get effectiveness +
-              hallucination scores plus an improved prompt suggestion.
+              Generate scenarios, run them, score effectiveness + hallucination, and get prompt suggestions.
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button onClick={() => start(5)} disabled={!!running} variant="outline" size="sm">
+          <div className="flex shrink-0 items-center gap-2">
+            <Button onClick={() => start(5)} disabled={!!running} variant="outline" size="sm" className="rounded-lg">
               {running && evalRow?.scenario_count === 5 ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Running…
-                </>
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <>
-                  <Play className="mr-2 h-4 w-4" />
-                  Run 5
-                </>
+                <><Play className="mr-1.5 h-3.5 w-3.5" />Run 5</>
               )}
             </Button>
-            <Button onClick={() => start(10)} disabled={!!running} variant="outline">
+            <Button onClick={() => start(10)} disabled={!!running} variant="outline" size="sm" className="rounded-lg">
               {running && evalRow?.scenario_count === 10 ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Running…
-                </>
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <>
-                  <Play className="mr-2 h-4 w-4" />
-                  Run 10
-                </>
+                <><Play className="mr-1.5 h-3.5 w-3.5" />Run 10</>
               )}
             </Button>
-            <Button onClick={() => start(50)} disabled={!!running}>
+            <Button onClick={() => start(50)} disabled={!!running} size="sm" className="rounded-lg">
               {running && evalRow?.scenario_count === 50 ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Running…
-                </>
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <>
-                  <Play className="mr-2 h-4 w-4" />
-                  Run 50
-                </>
+                <><Play className="mr-1.5 h-3.5 w-3.5" />Run 50</>
               )}
             </Button>
           </div>
         </CardHeader>
         {evalRow && (
-          <CardContent className="space-y-3">
-            <div className="flex items-center gap-3">
-              <Progress value={progress} className="flex-1" />
-              <span className="text-xs text-muted-foreground">
-                {evalRow.completed_count}/{evalRow.scenario_count}
+          <CardContent className="space-y-4 border-t bg-muted/20 pt-4">
+            <div className="flex items-end justify-between">
+              <div className="space-y-0.5">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-primary">
+                  {evalRow.status === "done"
+                    ? "Evaluation complete"
+                    : evalRow.status === "error"
+                      ? "Evaluation failed"
+                      : `Running evaluation · ${evalRow.status}`}
+                </div>
+                <div className="text-sm font-medium">
+                  {currentScenario
+                    ? `Scenario ${currentScenario.idx + 1}: ${currentScenario.user_goal.slice(0, 60)}${currentScenario.user_goal.length > 60 ? "…" : ""}`
+                    : evalRow.status === "done"
+                      ? "All scenarios processed"
+                      : "Preparing scenarios…"}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold tabular-nums">
+                  {evalRow.completed_count}
+                  <span className="text-muted-foreground/60">/{evalRow.scenario_count}</span>
+                </div>
+                <div className="text-[10px] font-medium text-muted-foreground">
+                  {progress.toFixed(0)}% complete
+                </div>
+              </div>
+            </div>
+
+            <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all duration-500 ease-out",
+                  evalRow.status === "error"
+                    ? "bg-destructive"
+                    : "bg-gradient-to-r from-primary via-primary to-primary/70 shadow-[0_0_12px_color-mix(in_oklab,var(--primary)_40%,transparent)]",
+                )}
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-medium">
+              <span className="flex items-center gap-1.5 text-emerald-600">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                {passedCount} passed
               </span>
-              <Badge variant={evalRow.status === "done" ? "default" : "secondary"}>
-                {evalRow.status}
-              </Badge>
+              <span className="flex items-center gap-1.5 text-destructive">
+                <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
+                {failedCount} failed
+              </span>
+              {running && (
+                <span className="flex items-center gap-1.5 text-muted-foreground">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />
+                  Active
+                </span>
+              )}
+              <span className="ml-auto">
+                <Badge
+                  variant={
+                    evalRow.status === "done"
+                      ? "default"
+                      : evalRow.status === "error"
+                        ? "destructive"
+                        : "secondary"
+                  }
+                  className="rounded-full text-[10px] uppercase tracking-wider"
+                >
+                  {evalRow.status}
+                </Badge>
+              </span>
             </div>
             {evalRow.error && (
               <p className="text-sm text-destructive">{evalRow.error}</p>
@@ -193,6 +240,7 @@ export function AutoEval({ systemPrompt, model, agentType, promptId, onApplyImpr
           </CardContent>
         )}
       </Card>
+
 
       {evalRow?.status === "done" && (
         <>
