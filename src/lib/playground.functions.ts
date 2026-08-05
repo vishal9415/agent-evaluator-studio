@@ -23,14 +23,16 @@ async function callGateway(body: Record<string, unknown>, attempt = 0): Promise<
   const res = await fetch(GATEWAY_URL, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      "Lovable-API-Key": apiKey,
+      "X-Lovable-AIG-SDK": "vercel-ai-sdk",
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
-    if (res.status === 429 && attempt < 10) {
+    const isTransientGatewayError = res.status === 429 || res.status >= 500;
+    if (isTransientGatewayError && attempt < 10) {
       // Honor Retry-After when present, otherwise exponential backoff with jitter.
       const retryAfter = Number(res.headers.get("retry-after"));
       const backoff = Number.isFinite(retryAfter) && retryAfter > 0
@@ -42,6 +44,9 @@ async function callGateway(body: Record<string, unknown>, attempt = 0): Promise<
       return callGateway(body, attempt + 1);
     }
     if (res.status === 429) throw new Error("The AI gateway is still busy after waiting. Please retry in about a minute.");
+    if (res.status >= 500) {
+      throw new Error("The AI service is temporarily unavailable after several retries. Please try again shortly.");
+    }
     if (res.status === 402) throw new Error("AI credits exhausted. Add credits to your Lovable workspace.");
     throw new Error(`AI gateway error ${res.status}: ${txt.slice(0, 300)}`);
   }
