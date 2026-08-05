@@ -10,13 +10,8 @@ export const MODELS = [
 ];
 
 export const AGENT_TYPES = [
-  { value: "chat", label: "Chat assistant" },
-  { value: "voice", label: "Voice agent" },
-  { value: "support", label: "Customer support" },
-  { value: "sales", label: "Sales / outbound" },
-  { value: "booking", label: "Appointment booking" },
-  { value: "tutor", label: "Tutor / coach" },
-  { value: "qa", label: "Knowledge Q&A" },
+  { value: "chat", label: "Chat" },
+  { value: "voice", label: "Voice" },
 ];
 
 export const DEFAULT_PROMPT = `You are a friendly customer support agent for Acme Cloud, a SaaS file-storage product.
