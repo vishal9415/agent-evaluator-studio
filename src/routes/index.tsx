@@ -17,9 +17,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { AGENT_TYPES, DEFAULT_PROMPT, MODELS } from "@/lib/playground-constants";
+import {
+  AGENT_TYPES,
+  DEFAULT_BEGIN_MESSAGE,
+  DEFAULT_PROMPT,
+  MODELS,
+  type Stage,
+} from "@/lib/playground-constants";
 import { ManualChat } from "@/components/playground/ManualChat";
 import { AutoEval } from "@/components/playground/AutoEval";
+import { StagesEditor } from "@/components/playground/StagesEditor";
 
 export const Route = createFileRoute("/")({
   head: () => ({
