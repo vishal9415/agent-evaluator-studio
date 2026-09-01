@@ -76,30 +76,39 @@ export type Database = {
       prompts: {
         Row: {
           agent_type: string
+          begin_message: string
           created_at: string
           id: string
           model: string
           name: string
+          stages: Json
           system_prompt: string
           updated_at: string
+          variables: Json
         }
         Insert: {
           agent_type?: string
+          begin_message?: string
           created_at?: string
           id?: string
           model?: string
           name?: string
+          stages?: Json
           system_prompt?: string
           updated_at?: string
+          variables?: Json
         }
         Update: {
           agent_type?: string
+          begin_message?: string
           created_at?: string
           id?: string
           model?: string
           name?: string
+          stages?: Json
           system_prompt?: string
           updated_at?: string
+          variables?: Json
         }
         Relationships: []
       }

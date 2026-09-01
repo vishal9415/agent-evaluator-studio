@@ -14,6 +14,44 @@ export const AGENT_TYPES = [
   { value: "voice", label: "Voice" },
 ];
 
+export type StageTransition = {
+  id: string;
+  target: string; // stage id
+  condition: string;
+};
+
+export type Stage = {
+  id: string;
+  name: string;
+  prompt: string;
+  transitions: StageTransition[];
+};
+
+export const DEFAULT_BEGIN_MESSAGE =
+  "Hi {{lead_name}}, this is Maya from Acme Cloud. Do you have a quick minute?";
+
+export function newId() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+/** move_to_<slug of stage name> */
+export function transitionToolName(stageName: string) {
+  const slug =
+    stageName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 40) || "stage";
+  return `move_to_${slug}`;
+}
+
+/** Substitute {{variable}} placeholders. Unknown vars are left as-is. */
+export function fillVariables(text: string, vars: Record<string, string>) {
+  return text.replace(/\{\{\s*([\w.-]+)\s*\}\}/g, (m, key: string) =>
+    vars[key] !== undefined && vars[key] !== "" ? vars[key] : m,
+  );
+}
+
 export const DEFAULT_PROMPT = `You are a friendly customer support agent for Acme Cloud, a SaaS file-storage product.
 
 Help users with: account questions, billing, file sharing, plans (Free, Pro, Team).
