@@ -265,6 +265,46 @@ function Playground() {
             </div>
 
             <div className="space-y-1.5">
+              <Label
+                htmlFor="begin"
+                className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+              >
+                Begin message
+              </Label>
+              <p className="text-[10px] leading-relaxed text-muted-foreground">
+                Spoken verbatim when the callee answers — no LLM call.{" "}
+                <code className="font-mono">{"{{lead_name}}"}</code>-style variables are substituted
+                at call time. Leave empty to have the model open from the system prompt instead.
+              </p>
+              <Textarea
+                id="begin"
+                value={beginMessage}
+                onChange={(e) => setBeginMessage(e.target.value)}
+                placeholder="Hi {{lead_name}}, this is Maya from Acme…"
+                className="min-h-[70px] resize-none rounded-xl bg-muted/30 text-xs leading-relaxed"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="vars"
+                className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+              >
+                Variables
+              </Label>
+              <Textarea
+                id="vars"
+                value={varsText}
+                onChange={(e) => setVarsText(e.target.value)}
+                placeholder={"lead_name=Priya\ncompany=Acme"}
+                className="min-h-[60px] resize-none rounded-xl bg-muted/30 font-mono text-xs leading-relaxed"
+              />
+              <p className="text-[10px] text-muted-foreground">
+                One <code className="font-mono">key=value</code> per line.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <Label
                   htmlFor="prompt"
@@ -276,13 +316,19 @@ function Playground() {
                   {systemPrompt.length} chars
                 </span>
               </div>
+              <p className="text-[10px] leading-relaxed text-muted-foreground">
+                The base prompt. When stages are configured this is prepended to the active
+                stage&apos;s prompt, so only one stage prompt is in context at a time.
+              </p>
               <Textarea
                 id="prompt"
                 value={systemPrompt}
                 onChange={(e) => setSystemPrompt(e.target.value)}
-                className="min-h-[300px] resize-none rounded-xl bg-muted/30 font-mono text-xs leading-relaxed"
+                className="min-h-[260px] resize-none rounded-xl bg-muted/30 font-mono text-xs leading-relaxed"
               />
             </div>
+
+            <StagesEditor stages={stages} onChange={setStages} />
 
             <Button onClick={savePrompt} disabled={saving} className="h-10 w-full rounded-lg">
               <Save className="mr-2 h-4 w-4" />
