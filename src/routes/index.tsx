@@ -354,11 +354,18 @@ function Playground() {
                 systemPrompt={systemPrompt}
                 model={model}
                 agentType={agentType}
+                beginMessage={beginMessage}
+                stages={stages}
+                variables={variables}
               />
             </TabsContent>
             <TabsContent value="auto" className="mt-4">
               <AutoEval
-                systemPrompt={systemPrompt}
+                systemPrompt={
+                  stages.length
+                    ? [systemPrompt, stages[0].prompt].filter(Boolean).join("\n\n")
+                    : systemPrompt
+                }
                 model={model}
                 agentType={agentType}
                 promptId={promptId}
