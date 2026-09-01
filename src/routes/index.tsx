@@ -54,16 +54,41 @@ type SavedPrompt = {
   system_prompt: string;
   model: string;
   agent_type: string;
+  begin_message: string;
+  stages: Stage[];
+  variables: Record<string, string>;
 };
+
+function varsToText(vars: Record<string, string>) {
+  return Object.entries(vars)
+    .map(([k, v]) => `${k}=${v}`)
+    .join("\n");
+}
+
+function textToVars(text: string) {
+  const out: Record<string, string> = {};
+  for (const line of text.split("\n")) {
+    const i = line.indexOf("=");
+    if (i <= 0) continue;
+    const k = line.slice(0, i).trim();
+    if (k) out[k] = line.slice(i + 1).trim();
+  }
+  return out;
+}
 
 function Playground() {
   const [name, setName] = useState("Untitled prompt");
+  const [beginMessage, setBeginMessage] = useState(DEFAULT_BEGIN_MESSAGE);
   const [systemPrompt, setSystemPrompt] = useState(DEFAULT_PROMPT);
+  const [stages, setStages] = useState<Stage[]>([]);
+  const [varsText, setVarsText] = useState("lead_name=Priya");
   const [model, setModel] = useState(MODELS[0].value);
   const [agentType, setAgentType] = useState("chat");
   const [promptId, setPromptId] = useState<string | null>(null);
   const [saved, setSaved] = useState<SavedPrompt[]>([]);
   const [saving, setSaving] = useState(false);
+
+  const variables = textToVars(varsText);
 
   useEffect(() => {
     void refreshSaved();
@@ -72,31 +97,34 @@ function Playground() {
   async function refreshSaved() {
     const { data } = await supabase
       .from("prompts")
-      .select("id, name, system_prompt, model, agent_type")
+      .select("id, name, system_prompt, model, agent_type, begin_message, stages, variables")
       .order("updated_at", { ascending: false })
       .limit(20);
-    if (data) setSaved(data as SavedPrompt[]);
+    if (data) setSaved(data as unknown as SavedPrompt[]);
   }
 
   async function savePrompt() {
     setSaving(true);
     try {
+      const payload = {
+        name,
+        system_prompt: systemPrompt,
+        model,
+        agent_type: agentType,
+        begin_message: beginMessage,
+        stages: stages as unknown as never,
+        variables: variables as unknown as never,
+      };
       if (promptId) {
         const { error } = await supabase
           .from("prompts")
-          .update({
-            name,
-            system_prompt: systemPrompt,
-            model,
-            agent_type: agentType,
-            updated_at: new Date().toISOString(),
-          })
+          .update({ ...payload, updated_at: new Date().toISOString() })
           .eq("id", promptId);
         if (error) throw error;
       } else {
         const { data, error } = await supabase
           .from("prompts")
-          .insert({ name, system_prompt: systemPrompt, model, agent_type: agentType })
+          .insert(payload)
           .select()
           .single();
         if (error) throw error;
@@ -116,6 +144,9 @@ function Playground() {
       setPromptId(null);
       setName("Untitled prompt");
       setSystemPrompt(DEFAULT_PROMPT);
+      setBeginMessage(DEFAULT_BEGIN_MESSAGE);
+      setStages([]);
+      setVarsText("lead_name=Priya");
       return;
     }
     const p = saved.find((x) => x.id === id);
@@ -125,6 +156,9 @@ function Playground() {
     setSystemPrompt(p.system_prompt);
     setModel(p.model);
     setAgentType(p.agent_type);
+    setBeginMessage(p.begin_message ?? "");
+    setStages(Array.isArray(p.stages) ? p.stages : []);
+    setVarsText(varsToText((p.variables ?? {}) as Record<string, string>));
   }
 
   return (
