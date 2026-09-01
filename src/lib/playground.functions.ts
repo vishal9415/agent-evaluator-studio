@@ -60,13 +60,25 @@ async function callGateway(body: Record<string, unknown>, attempt = 0): Promise<
   return res.json();
 }
 
-/** Chat completion for the manual chat playground. */
+/** Chat completion for the manual chat playground (stage-aware). */
 export const chatCompletion = createServerFn({ method: "POST" })
   .inputValidator((data) =>
     z
       .object({
         model: z.string().min(1).max(120),
         systemPrompt: z.string().max(20000),
+        stagePrompt: z.string().max(20000).optional(),
+        transitions: z
+          .array(
+            z.object({
+              tool: z.string().min(1).max(80),
+              targetId: z.string().min(1).max(80),
+              targetName: z.string().min(1).max(120),
+              condition: z.string().max(2000).default(""),
+            }),
+          )
+          .max(20)
+          .optional(),
         messages: z
           .array(
             z.object({
@@ -80,13 +92,52 @@ export const chatCompletion = createServerFn({ method: "POST" })
       .parse(data),
   )
   .handler(async ({ data }) => {
+    const system = [data.systemPrompt, data.stagePrompt].filter(Boolean).join("\n\n");
     const messages: Msg[] = [
-      ...(data.systemPrompt ? [{ role: "system" as const, content: data.systemPrompt }] : []),
+      ...(system ? [{ role: "system" as const, content: system }] : []),
       ...data.messages,
     ];
-    const json = await callGateway({ model: data.model, messages });
-    const content: string = json?.choices?.[0]?.message?.content ?? "";
-    return { content };
+
+    const transitions = data.transitions ?? [];
+    const tools = transitions.length
+      ? transitions.map((t) => ({
+          type: "function",
+          function: {
+            name: t.tool,
+            description: `Hand off the conversation to the "${t.targetName}" stage.${
+              t.condition ? ` Call this when: ${t.condition}` : ""
+            }`,
+            parameters: {
+              type: "object",
+              properties: { reason: { type: "string" } },
+              required: ["reason"],
+              additionalProperties: false,
+            },
+          },
+        }))
+      : undefined;
+
+    const json = await callGateway({
+      model: data.model,
+      messages,
+      ...(tools ? { tools } : {}),
+    });
+    const msg = json?.choices?.[0]?.message;
+    const content: string = msg?.content ?? "";
+    const call = msg?.tool_calls?.[0];
+    const match = call ? transitions.find((t) => t.tool === call.function?.name) : undefined;
+    let reason = "";
+    if (call?.function?.arguments) {
+      try {
+        reason = String(JSON.parse(call.function.arguments)?.reason ?? "");
+      } catch {
+        reason = "";
+      }
+    }
+    return {
+      content,
+      moveTo: match ? { id: match.targetId, name: match.targetName, tool: match.tool, reason } : null,
+    };
   });
 
 /** Generate N scenarios for the given prompt + agent type. */
