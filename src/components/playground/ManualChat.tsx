@@ -65,8 +65,17 @@ const RECOG_LANGS = [
   { v: "de-DE", label: "German" },
 ];
 
-export function ManualChat({ systemPrompt, model, agentType }: Props) {
+export function ManualChat({
+  systemPrompt,
+  model,
+  agentType,
+  beginMessage = "",
+  stages = [],
+  variables = {},
+}: Props) {
   const [messages, setMessages] = useState<Msg[]>([]);
+  const [stageId, setStageId] = useState<string | null>(stages[0]?.id ?? null);
+
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [voice, setVoice] = useState(agentType === "voice");
