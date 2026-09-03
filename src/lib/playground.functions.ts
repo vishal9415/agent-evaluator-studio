@@ -548,3 +548,219 @@ export const synthesizeSpeech = createServerFn({ method: "POST" })
     const audio = Buffer.from(buf).toString("base64");
     return { audio, mime: "audio/mpeg" };
   });
+
+/* ------------------------------------------------------------------ *
+ * Prompt Coach — understands the user's goal first, then suggests
+ * section-by-section improvements that align with that goal.
+ * ------------------------------------------------------------------ */
+
+const coachSectionsSchema = z.object({
+  model: z.string().min(1).max(120),
+  agentType: z.string().min(1).max(40),
+  beginMessage: z.string().max(20000).default(""),
+  systemPrompt: z.string().max(20000).default(""),
+  stages: z
+    .array(
+      z.object({
+        id: z.string().min(1).max(80),
+        name: z.string().max(120).default(""),
+        prompt: z.string().max(20000).default(""),
+      }),
+    )
+    .max(20)
+    .default([]),
+});
+
+function promptSnapshot(d: z.infer<typeof coachSectionsSchema>) {
+  const parts = [
+    `Agent type: ${d.agentType}`,
+    `--- BEGIN MESSAGE ---\n${d.beginMessage || "(empty)"}`,
+    `--- SYSTEM PROMPT ---\n${d.systemPrompt || "(empty)"}`,
+  ];
+  d.stages.forEach((s, i) => {
+    parts.push(`--- STAGE ${i + 1}: ${s.name || "(unnamed)"} (id=${s.id}) ---\n${s.prompt || "(empty)"}`);
+  });
+  return parts.join("\n\n");
+}
+
+/** Step 1: ask the user clarifying questions about their goal before suggesting anything. */
+export const coachClarify = createServerFn({ method: "POST" })
+  .inputValidator((data) => coachSectionsSchema.parse(data))
+  .handler(async ({ data }) => {
+    const tools = [
+      {
+        type: "function",
+        function: {
+          name: "emit_questions",
+          description: "Return clarifying questions plus a first-pass reading of the prompt's intent.",
+          parameters: {
+            type: "object",
+            properties: {
+              inferred_goal: { type: "string" },
+              questions: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    question: { type: "string" },
+                    why: { type: "string" },
+                    suggested_answer: { type: "string" },
+                  },
+                  required: ["id", "question", "why", "suggested_answer"],
+                  additionalProperties: false,
+                },
+              },
+            },
+            required: ["inferred_goal", "questions"],
+            additionalProperties: false,
+          },
+        },
+      },
+    ];
+    const json = await callGateway({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        {
+          role: "system",
+          content: `You are a prompt engineering coach for conversational ${data.agentType} agents.
+Before giving ANY advice you must understand what the user is trying to achieve.
+Read the current prompt configuration, state your inferred goal in one or two sentences, then ask 4-6 short, high-value clarifying questions (business objective, target user, success criteria, tone, hard constraints, what must never be said/invented, escalation rules).
+For each question provide a plausible suggested_answer inferred from the prompt so the user can accept it quickly. Do NOT propose prompt changes yet.`,
+        },
+        { role: "user", content: promptSnapshot(data) },
+      ],
+      tools,
+      tool_choice: { type: "function", function: { name: "emit_questions" } },
+    });
+    const call = json?.choices?.[0]?.message?.tool_calls?.[0];
+    const args = call ? JSON.parse(call.function.arguments) : { inferred_goal: "", questions: [] };
+    return {
+      inferredGoal: String(args.inferred_goal ?? ""),
+      questions: (args.questions ?? []).slice(0, 6) as Array<{
+        id: string;
+        question: string;
+        why: string;
+        suggested_answer: string;
+      }>,
+    };
+  });
+
+/** Step 2: goal-aligned, section-by-section suggestions. */
+export const coachSuggest = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    coachSectionsSchema
+      .extend({
+        goal: z.string().max(4000).default(""),
+        answers: z
+          .array(
+            z.object({
+              question: z.string().max(1000),
+              answer: z.string().max(2000).default(""),
+            }),
+          )
+          .max(12)
+          .default([]),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const tools = [
+      {
+        type: "function",
+        function: {
+          name: "emit_suggestions",
+          description: "Return goal-aligned improvement suggestions per prompt section.",
+          parameters: {
+            type: "object",
+            properties: {
+              goal_understanding: { type: "string" },
+              overall_notes: { type: "array", items: { type: "string" } },
+              sections: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    key: { type: "string" },
+                    label: { type: "string" },
+                    verdict: { type: "string" },
+                    issues: { type: "array", items: { type: "string" } },
+                    suggestions: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          change: { type: "string" },
+                          why: { type: "string" },
+                          goal_alignment: { type: "string" },
+                        },
+                        required: ["change", "why", "goal_alignment"],
+                        additionalProperties: false,
+                      },
+                    },
+                    rewritten: { type: "string" },
+                  },
+                  required: ["key", "label", "verdict", "issues", "suggestions", "rewritten"],
+                  additionalProperties: false,
+                },
+              },
+            },
+            required: ["goal_understanding", "overall_notes", "sections"],
+            additionalProperties: false,
+          },
+        },
+      },
+    ];
+
+    const sectionKeys = [
+      "begin_message",
+      "system_prompt",
+      ...data.stages.map((s) => `stage:${s.id}`),
+    ];
+
+    const json = await callGateway({
+      model: data.model,
+      messages: [
+        {
+          role: "system",
+          content: `You are a prompt engineering coach for conversational ${data.agentType} agents.
+
+The user's goal and answers are authoritative. NEVER suggest a change that conflicts with the stated goal, scope, tone or constraints — do not broaden scope, add capabilities, change persona, or "improve" things the user did not ask for. If a section already serves the goal, say so in verdict and return an empty suggestions list with rewritten = the current text unchanged.
+
+Produce one section object for EACH of these keys, in this order: ${sectionKeys.join(", ")}.
+For each: verdict (one sentence), issues (concrete problems that hurt the goal, hallucination risk, or ${data.agentType} delivery), suggestions (each with change, why, goal_alignment explaining how it serves the stated goal), and rewritten (a complete, ready-to-paste replacement for that section that keeps the user's intent, variables like {{lead_name}}, and voice/chat suitability).
+Keep rewritten text tight and directly usable. Prefer explicit grounding/refusal rules to cut hallucination.`,
+        },
+        {
+          role: "user",
+          content: `Stated goal / use case:
+${data.goal || "(not provided)"}
+
+Clarifying answers:
+${data.answers.map((a) => `Q: ${a.question}\nA: ${a.answer || "(no answer)"}`).join("\n\n") || "(none)"}
+
+Current configuration:
+${promptSnapshot(data)}`,
+        },
+      ],
+      tools,
+      tool_choice: { type: "function", function: { name: "emit_suggestions" } },
+    });
+
+    const call = json?.choices?.[0]?.message?.tool_calls?.[0];
+    const args = call
+      ? JSON.parse(call.function.arguments)
+      : { goal_understanding: "", overall_notes: [], sections: [] };
+    return {
+      goalUnderstanding: String(args.goal_understanding ?? ""),
+      overallNotes: (args.overall_notes ?? []) as string[],
+      sections: (args.sections ?? []) as Array<{
+        key: string;
+        label: string;
+        verdict: string;
+        issues: string[];
+        suggestions: Array<{ change: string; why: string; goal_alignment: string }>;
+        rewritten: string;
+      }>,
+    };
+  });
