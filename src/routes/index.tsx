@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Save, Sparkles } from "lucide-react";
+import { Lightbulb, Save, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,7 @@ import {
 import { ManualChat } from "@/components/playground/ManualChat";
 import { AutoEval } from "@/components/playground/AutoEval";
 import { StagesEditor } from "@/components/playground/StagesEditor";
+import { PromptCoach } from "@/components/playground/PromptCoach";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -89,6 +90,7 @@ function Playground() {
   const [promptId, setPromptId] = useState<string | null>(null);
   const [saved, setSaved] = useState<SavedPrompt[]>([]);
   const [saving, setSaving] = useState(false);
+  const [coachOpen, setCoachOpen] = useState(false);
 
   const variables = textToVars(varsText);
   const fetchPrompts = useServerFn(listPrompts);
@@ -176,9 +178,20 @@ function Playground() {
               </p>
             </div>
           </div>
-          <div className="hidden items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs text-muted-foreground md:flex">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            Ready
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 rounded-lg"
+              onClick={() => setCoachOpen(true)}
+            >
+              <Lightbulb className="mr-2 h-4 w-4 text-primary" />
+              Improve prompt
+            </Button>
+            <div className="hidden items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs text-muted-foreground md:flex">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              Ready
+            </div>
           </div>
         </div>
       </header>
@@ -327,6 +340,15 @@ function Playground() {
 
             <StagesEditor stages={stages} onChange={setStages} />
 
+            <Button
+              variant="outline"
+              onClick={() => setCoachOpen(true)}
+              className="h-10 w-full rounded-lg"
+            >
+              <Lightbulb className="mr-2 h-4 w-4 text-primary" />
+              Suggest improvements
+            </Button>
+
             <Button onClick={savePrompt} disabled={saving} className="h-10 w-full rounded-lg">
               <Save className="mr-2 h-4 w-4" />
               {promptId ? "Update prompt" : "Save prompt"}
@@ -372,6 +394,21 @@ function Playground() {
           </Tabs>
         </div>
       </main>
+
+      <PromptCoach
+        open={coachOpen}
+        onOpenChange={setCoachOpen}
+        model={model}
+        agentType={agentType}
+        beginMessage={beginMessage}
+        systemPrompt={systemPrompt}
+        stages={stages}
+        onApplyBeginMessage={setBeginMessage}
+        onApplySystemPrompt={setSystemPrompt}
+        onApplyStagePrompt={(id, text) =>
+          setStages((prev) => prev.map((s) => (s.id === id ? { ...s, prompt: text } : s)))
+        }
+      />
     </div>
   );
 }
