@@ -118,6 +118,17 @@ export function ManualChat({
     setSpeakOutput(agentType === "voice");
   }, [agentType]);
 
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (seeded.current) return;
+    const opener = fillVariables(beginMessage ?? "", variables).trim();
+    if (!opener) return;
+    seeded.current = true;
+    setMessages([{ role: "assistant", content: opener }]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [beginMessage]);
+
+
   const speakBrowser = useCallback((text: string) => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
