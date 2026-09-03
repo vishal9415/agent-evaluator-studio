@@ -16,7 +16,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
+import { listPrompts, savePrompt as savePromptFn } from "@/lib/playground-data.functions";
+
 import {
   AGENT_TYPES,
   DEFAULT_BEGIN_MESSAGE,
