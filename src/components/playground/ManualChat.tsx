@@ -11,6 +11,8 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { chatCompletion, synthesizeSpeech } from "@/lib/playground.functions";
+import { fillVariables, transitionToolName, type Stage } from "@/lib/playground-constants";
+
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -20,7 +22,11 @@ interface Props {
   systemPrompt: string;
   model: string;
   agentType: string;
+  beginMessage?: string;
+  stages?: Stage[];
+  variables?: Record<string, string>;
 }
+
 
 type AnyWindow = Window & {
   webkitSpeechRecognition?: new () => any;
@@ -59,8 +65,17 @@ const RECOG_LANGS = [
   { v: "de-DE", label: "German" },
 ];
 
-export function ManualChat({ systemPrompt, model, agentType }: Props) {
+export function ManualChat({
+  systemPrompt,
+  model,
+  agentType,
+  beginMessage = "",
+  stages = [],
+  variables = {},
+}: Props) {
   const [messages, setMessages] = useState<Msg[]>([]);
+  const [stageId, setStageId] = useState<string | null>(stages[0]?.id ?? null);
+
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [voice, setVoice] = useState(agentType === "voice");
@@ -102,6 +117,17 @@ export function ManualChat({ systemPrompt, model, agentType }: Props) {
     setVoice(agentType === "voice");
     setSpeakOutput(agentType === "voice");
   }, [agentType]);
+
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (seeded.current) return;
+    const opener = fillVariables(beginMessage ?? "", variables).trim();
+    if (!opener) return;
+    seeded.current = true;
+    setMessages([{ role: "assistant", content: opener }]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [beginMessage]);
+
 
   const speakBrowser = useCallback((text: string) => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
@@ -156,6 +182,25 @@ export function ManualChat({ systemPrompt, model, agentType }: Props) {
     [speakOutput, ttsFallback, speakBrowser, tts, voiceId, ttsModel, speed, stability, similarity, style, speakerBoost],
   );
 
+  const stagePayload = (id: string | null) => {
+    const stage = stages.find((s) => s.id === id);
+    if (!stage) return {};
+    return {
+      stagePrompt: fillVariables(stage.prompt, variables),
+      transitions: stage.transitions
+        .filter((t) => stages.some((s) => s.id === t.target))
+        .map((t) => {
+          const target = stages.find((s) => s.id === t.target)!;
+          return {
+            tool: transitionToolName(target.name),
+            targetId: target.id,
+            targetName: target.name,
+            condition: t.condition,
+          };
+        }),
+    };
+  };
+
   const send = async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || loading) return;
@@ -164,9 +209,36 @@ export function ManualChat({ systemPrompt, model, agentType }: Props) {
     setInput("");
     setLoading(true);
     try {
-      const res = await chat({ data: { model, systemPrompt, messages: next } });
+      const filledSystem = fillVariables(systemPrompt, variables);
+      let activeStage = stageId;
+      let res = await chat({
+        data: { model, systemPrompt: filledSystem, messages: next, ...stagePayload(activeStage) },
+      });
+      const history: Msg[] = [...next];
+
+      if (res.moveTo) {
+        activeStage = res.moveTo.id;
+        setStageId(activeStage);
+        if (res.content) history.push({ role: "assistant", content: res.content });
+        history.push({
+          role: "assistant",
+          content: `→ Moved to stage "${res.moveTo.name}"${res.moveTo.reason ? `: ${res.moveTo.reason}` : ""}`,
+        });
+        setMessages(history);
+        if (!res.content) {
+          res = await chat({
+            data: {
+              model,
+              systemPrompt: filledSystem,
+              messages: next,
+              ...stagePayload(activeStage),
+            },
+          });
+        }
+      }
+
       const reply = res.content || "(empty response)";
-      setMessages([...next, { role: "assistant", content: reply }]);
+      setMessages([...history, { role: "assistant", content: reply }]);
       void speak(reply);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Chat failed");
@@ -175,6 +247,7 @@ export function ManualChat({ systemPrompt, model, agentType }: Props) {
       setLoading(false);
     }
   };
+
 
   const clearSilence = () => {
     if (silenceTimer.current) {
