@@ -20,7 +20,11 @@ interface Props {
   systemPrompt: string;
   model: string;
   agentType: string;
+  beginMessage?: string;
+  stages?: Stage[];
+  variables?: Record<string, string>;
 }
+
 
 type AnyWindow = Window & {
   webkitSpeechRecognition?: new () => any;
