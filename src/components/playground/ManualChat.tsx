@@ -11,6 +11,8 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { chatCompletion, synthesizeSpeech } from "@/lib/playground.functions";
+import { fillVariables, transitionToolName, type Stage } from "@/lib/playground-constants";
+
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
