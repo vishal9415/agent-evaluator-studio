@@ -16,7 +16,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
+import { listPrompts, savePrompt as savePromptFn } from "@/lib/playground-data.functions";
+
 import {
   AGENT_TYPES,
   DEFAULT_BEGIN_MESSAGE,
@@ -89,47 +91,41 @@ function Playground() {
   const [saving, setSaving] = useState(false);
 
   const variables = textToVars(varsText);
+  const fetchPrompts = useServerFn(listPrompts);
+  const persistPrompt = useServerFn(savePromptFn);
 
   useEffect(() => {
     void refreshSaved();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function refreshSaved() {
-    const { data } = await supabase
-      .from("prompts")
-      .select("id, name, system_prompt, model, agent_type, begin_message, stages, variables")
-      .order("updated_at", { ascending: false })
-      .limit(20);
-    if (data) setSaved(data as unknown as SavedPrompt[]);
+    try {
+      const data = await fetchPrompts();
+      setSaved(data as unknown as SavedPrompt[]);
+    } catch {
+      /* ignore */
+    }
   }
 
   async function savePrompt() {
     setSaving(true);
     try {
-      const payload = {
-        name,
-        system_prompt: systemPrompt,
-        model,
-        agent_type: agentType,
-        begin_message: beginMessage,
-        stages: stages as unknown as never,
-        variables: variables as unknown as never,
-      };
-      if (promptId) {
-        const { error } = await supabase
-          .from("prompts")
-          .update({ ...payload, updated_at: new Date().toISOString() })
-          .eq("id", promptId);
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from("prompts")
-          .insert(payload)
-          .select()
-          .single();
-        if (error) throw error;
-        if (data) setPromptId(data.id);
-      }
+      const res = await persistPrompt({
+        data: {
+          id: promptId,
+          payload: {
+            name,
+            system_prompt: systemPrompt,
+            model,
+            agent_type: agentType as "chat" | "voice",
+            begin_message: beginMessage,
+            stages,
+            variables,
+          },
+        },
+      });
+      if (res.id) setPromptId(res.id);
       toast.success("Saved");
       void refreshSaved();
     } catch (e) {
@@ -138,6 +134,7 @@ function Playground() {
       setSaving(false);
     }
   }
+
 
   function loadPrompt(id: string) {
     if (id === "__new__") {

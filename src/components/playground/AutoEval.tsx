@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { runEvaluation } from "@/lib/playground.functions";
-import { supabase } from "@/integrations/supabase/client";
+import { getEvaluation } from "@/lib/playground-data.functions";
+
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -53,6 +54,7 @@ export function AutoEval({ systemPrompt, model, agentType, promptId, onApplyImpr
   const [starting, setStarting] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const run = useServerFn(runEvaluation);
+  const fetchEval = useServerFn(getEvaluation);
   const qc = useQueryClient();
 
   // Poll while running
@@ -60,13 +62,14 @@ export function AutoEval({ systemPrompt, model, agentType, promptId, onApplyImpr
     if (!activeEvalId) return;
     let cancelled = false;
     const tick = async () => {
-      const [{ data: ev }, { data: sc }] = await Promise.all([
-        supabase.from("evaluations").select("*").eq("id", activeEvalId).single(),
-        supabase.from("scenarios").select("*").eq("evaluation_id", activeEvalId).order("idx"),
-      ]);
-      if (cancelled) return;
-      if (ev) setEvalRow(ev as EvalRow);
-      if (sc) setScenarios(sc as ScenarioRow[]);
+      try {
+        const res = await fetchEval({ data: { evaluationId: activeEvalId } });
+        if (cancelled) return;
+        if (res.evaluation) setEvalRow(res.evaluation as EvalRow);
+        setScenarios((res.scenarios ?? []) as ScenarioRow[]);
+      } catch {
+        /* transient */
+      }
     };
     tick();
     const id = setInterval(tick, 2000);
@@ -74,7 +77,9 @@ export function AutoEval({ systemPrompt, model, agentType, promptId, onApplyImpr
       cancelled = true;
       clearInterval(id);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeEvalId]);
+
 
   const start = async (count: number) => {
     if (!systemPrompt.trim()) {
