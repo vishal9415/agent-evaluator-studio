@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { runEvaluation } from "@/lib/playground.functions";
-import { supabase } from "@/integrations/supabase/client";
+import { getEvaluation } from "@/lib/playground-data.functions";
+
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
