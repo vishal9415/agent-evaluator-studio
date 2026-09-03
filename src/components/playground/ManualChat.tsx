@@ -171,6 +171,25 @@ export function ManualChat({
     [speakOutput, ttsFallback, speakBrowser, tts, voiceId, ttsModel, speed, stability, similarity, style, speakerBoost],
   );
 
+  const stagePayload = (id: string | null) => {
+    const stage = stages.find((s) => s.id === id);
+    if (!stage) return {};
+    return {
+      stagePrompt: fillVariables(stage.prompt, variables),
+      transitions: stage.transitions
+        .filter((t) => stages.some((s) => s.id === t.target))
+        .map((t) => {
+          const target = stages.find((s) => s.id === t.target)!;
+          return {
+            tool: transitionToolName(target.name),
+            targetId: target.id,
+            targetName: target.name,
+            condition: t.condition,
+          };
+        }),
+    };
+  };
+
   const send = async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || loading) return;
@@ -179,9 +198,36 @@ export function ManualChat({
     setInput("");
     setLoading(true);
     try {
-      const res = await chat({ data: { model, systemPrompt, messages: next } });
+      const filledSystem = fillVariables(systemPrompt, variables);
+      let activeStage = stageId;
+      let res = await chat({
+        data: { model, systemPrompt: filledSystem, messages: next, ...stagePayload(activeStage) },
+      });
+      const history: Msg[] = [...next];
+
+      if (res.moveTo) {
+        activeStage = res.moveTo.id;
+        setStageId(activeStage);
+        if (res.content) history.push({ role: "assistant", content: res.content });
+        history.push({
+          role: "assistant",
+          content: `→ Moved to stage "${res.moveTo.name}"${res.moveTo.reason ? `: ${res.moveTo.reason}` : ""}`,
+        });
+        setMessages(history);
+        if (!res.content) {
+          res = await chat({
+            data: {
+              model,
+              systemPrompt: filledSystem,
+              messages: next,
+              ...stagePayload(activeStage),
+            },
+          });
+        }
+      }
+
       const reply = res.content || "(empty response)";
-      setMessages([...next, { role: "assistant", content: reply }]);
+      setMessages([...history, { role: "assistant", content: reply }]);
       void speak(reply);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Chat failed");
@@ -190,6 +236,7 @@ export function ManualChat({
       setLoading(false);
     }
   };
+
 
   const clearSilence = () => {
     if (silenceTimer.current) {
