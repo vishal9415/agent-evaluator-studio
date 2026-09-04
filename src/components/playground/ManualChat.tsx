@@ -448,7 +448,7 @@ export function ManualChat({
                       <div className="flex justify-between text-xs"><Label>Min speech length</Label><span className="text-muted-foreground">{minSpeechChars} chars</span></div>
                       <Slider value={[minSpeechChars]} min={1} max={20} step={1} onValueChange={(v) => setMinSpeechChars(v[0])} />
                     </div>
-                    <div className="flex items-center justify-between"><Label className="text-xs">Continuous listening</Label><Switch checked={continuous} onCheckedChange={setContinuous} /></div>
+                    <div className="flex items-center justify-between"><Label className="text-xs">Mute mic while agent speaks</Label><Switch checked={muteWhileSpeaking} onCheckedChange={setMuteWhileSpeaking} /></div>
                     <div className="flex items-center justify-between"><Label className="text-xs">Interim results</Label><Switch checked={interim} onCheckedChange={setInterim} /></div>
                     <div className="flex items-center justify-between"><Label className="text-xs">Auto-send on silence</Label><Switch checked={autoSend} onCheckedChange={setAutoSend} /></div>
                   </div>
