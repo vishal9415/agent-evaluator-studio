@@ -93,7 +93,7 @@ export function ManualChat({
 
   // VAD / recognition settings
   const [recogLang, setRecogLang] = useState("en-US");
-  const [continuous, setContinuous] = useState(false);
+  const [muteWhileSpeaking, setMuteWhileSpeaking] = useState(true);
   const [interim, setInterim] = useState(true);
   const [silenceMs, setSilenceMs] = useState(1200);
   const [minSpeechChars, setMinSpeechChars] = useState(2);
