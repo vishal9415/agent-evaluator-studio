@@ -93,7 +93,7 @@ export function ManualChat({
 
   // VAD / recognition settings
   const [recogLang, setRecogLang] = useState("en-US");
-  const [continuous, setContinuous] = useState(false);
+  const [muteWhileSpeaking, setMuteWhileSpeaking] = useState(true);
   const [interim, setInterim] = useState(true);
   const [silenceMs, setSilenceMs] = useState(1200);
   const [minSpeechChars, setMinSpeechChars] = useState(2);
@@ -108,6 +108,8 @@ export function ManualChat({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const silenceTimer = useRef<number | null>(null);
   const lastTranscript = useRef<string>("");
+  const sessionRef = useRef(false);
+
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -142,8 +144,13 @@ export function ManualChat({
       voices.find((v) => v.lang === u.lang) ||
       voices.find((v) => v.lang.startsWith(base));
     if (preferred) u.voice = preferred;
+    if (muteWhileSpeaking) {
+      micMuted.current = true;
+      u.onend = () => { micMuted.current = false; };
+      u.onerror = () => { micMuted.current = false; };
+    }
     window.speechSynthesis.speak(u);
-  }, [recogLang, speed]);
+  }, [recogLang, speed, muteWhileSpeaking]);
 
   const speak = useCallback(
     async (text: string) => {
@@ -171,16 +178,25 @@ export function ManualChat({
         }
         const audio = new Audio(`data:${res.mime};base64,${res.audio}`);
         audioRef.current = audio;
+        if (muteWhileSpeaking) {
+          micMuted.current = true;
+          const unmute = () => { micMuted.current = false; };
+          audio.onended = unmute;
+          audio.onerror = unmute;
+          audio.onpause = unmute;
+        }
         await audio.play();
       } catch (e) {
         const msg = e instanceof Error ? e.message : "TTS failed";
         toast.warning(`Premium voice unavailable — using browser voice. (${msg.slice(0, 100)})`);
         setTtsFallback(true);
+        micMuted.current = false;
         speakBrowser(text);
       }
     },
-    [speakOutput, ttsFallback, speakBrowser, tts, voiceId, ttsModel, speed, stability, similarity, style, speakerBoost],
+    [speakOutput, ttsFallback, speakBrowser, tts, voiceId, ttsModel, speed, stability, similarity, style, speakerBoost, muteWhileSpeaking],
   );
+
 
   const stagePayload = (id: string | null) => {
     const stage = stages.find((s) => s.id === id);
@@ -256,51 +272,101 @@ export function ManualChat({
     }
   };
 
-  const startListening = () => {
+  const beginRecognition = () => {
     const w = window as AnyWindow;
     const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
-    if (!SR) {
-      toast.error("Speech recognition not supported in this browser. Try Chrome.");
-      return;
-    }
+    if (!SR) return false;
     const rec = new SR();
     rec.lang = recogLang;
     rec.interimResults = interim;
-    rec.continuous = continuous;
+    rec.continuous = true;
     lastTranscript.current = "";
 
     rec.onresult = (ev: any) => {
       const transcript = Array.from(ev.results)
+        .slice(ev.resultIndex)
         .map((r: any) => r[0].transcript)
         .join(" ")
         .trim();
+      if (!transcript) return;
       lastTranscript.current = transcript;
       setInput(transcript);
 
       clearSilence();
       silenceTimer.current = window.setTimeout(() => {
-        if (transcript.length >= minSpeechChars) {
-          try { rec.stop(); } catch { /* noop */ }
-          if (autoSend) send(transcript);
+        const utterance = lastTranscript.current.trim();
+        if (utterance.length >= minSpeechChars && autoSend) {
+          lastTranscript.current = "";
+          setInput("");
+          void send(utterance);
         }
       }, silenceMs);
     };
-    rec.onerror = () => { clearSilence(); setListening(false); };
-    rec.onend = () => { clearSilence(); setListening(false); };
+    rec.onerror = (ev: any) => {
+      clearSilence();
+      if (ev?.error === "not-allowed" || ev?.error === "service-not-allowed") {
+        sessionRef.current = false;
+        setListening(false);
+        toast.error("Microphone permission denied");
+      }
+    };
+    rec.onend = () => {
+      clearSilence();
+      if (sessionRef.current) {
+        // keep the mic live for the whole call
+        window.setTimeout(() => {
+          if (!sessionRef.current) return;
+          try { rec.start(); } catch { /* already started */ }
+        }, 250);
+      } else {
+        setListening(false);
+      }
+    };
     recRef.current = rec;
-    try { rec.start(); setListening(true); } catch {
+    try {
+      rec.start();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const startListening = () => {
+    const w = window as AnyWindow;
+    if (!(w.SpeechRecognition || w.webkitSpeechRecognition)) {
+      toast.error("Speech recognition not supported in this browser. Try Chrome.");
+      return;
+    }
+    sessionRef.current = true;
+    if (beginRecognition()) {
+      setListening(true);
+      toast.success("Mic live — speak any time. Click again to end the call.");
+    } else {
+      sessionRef.current = false;
       toast.error("Could not start mic");
     }
   };
 
   const stopListening = () => {
+    sessionRef.current = false;
     clearSilence();
     try { recRef.current?.stop(); } catch { /* noop */ }
+    recRef.current = null;
     setListening(false);
-    if (autoSend && lastTranscript.current.trim().length >= minSpeechChars) {
-      send(lastTranscript.current);
+    const utterance = lastTranscript.current.trim();
+    lastTranscript.current = "";
+    if (autoSend && utterance.length >= minSpeechChars) {
+      send(utterance);
     }
   };
+
+  useEffect(() => {
+    return () => {
+      sessionRef.current = false;
+      try { recRef.current?.stop(); } catch { /* noop */ }
+    };
+  }, []);
+
 
   const selectedVoice = ELEVEN_VOICES.find((v) => v.id === voiceId);
 
@@ -396,7 +462,7 @@ export function ManualChat({
                       <div className="flex justify-between text-xs"><Label>Min speech length</Label><span className="text-muted-foreground">{minSpeechChars} chars</span></div>
                       <Slider value={[minSpeechChars]} min={1} max={20} step={1} onValueChange={(v) => setMinSpeechChars(v[0])} />
                     </div>
-                    <div className="flex items-center justify-between"><Label className="text-xs">Continuous listening</Label><Switch checked={continuous} onCheckedChange={setContinuous} /></div>
+                    <div className="flex items-center justify-between"><Label className="text-xs">Mute mic while agent speaks</Label><Switch checked={muteWhileSpeaking} onCheckedChange={setMuteWhileSpeaking} /></div>
                     <div className="flex items-center justify-between"><Label className="text-xs">Interim results</Label><Switch checked={interim} onCheckedChange={setInterim} /></div>
                     <div className="flex items-center justify-between"><Label className="text-xs">Auto-send on silence</Label><Switch checked={autoSend} onCheckedChange={setAutoSend} /></div>
                   </div>
