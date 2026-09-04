@@ -550,8 +550,9 @@ export const synthesizeSpeech = createServerFn({ method: "POST" })
   });
 
 /* ------------------------------------------------------------------ *
- * Prompt Coach — understands the user's goal first, then suggests
- * section-by-section improvements that align with that goal.
+ * Prompt Coach — infers the objective from the existing prompt
+ * configuration (begin message, system prompt, all stages and their
+ * transitions), then suggests section-by-section improvements.
  * ------------------------------------------------------------------ */
 
 const coachSectionsSchema = z.object({
@@ -565,6 +566,15 @@ const coachSectionsSchema = z.object({
         id: z.string().min(1).max(80),
         name: z.string().max(120).default(""),
         prompt: z.string().max(20000).default(""),
+        transitions: z
+          .array(
+            z.object({
+              target: z.string().max(120).default(""),
+              condition: z.string().max(2000).default(""),
+            }),
+          )
+          .max(20)
+          .default([]),
       }),
     )
     .max(20)
@@ -572,105 +582,39 @@ const coachSectionsSchema = z.object({
 });
 
 function promptSnapshot(d: z.infer<typeof coachSectionsSchema>) {
+  const nameOf = (id: string) => d.stages.find((s) => s.id === id)?.name || id;
   const parts = [
     `Agent type: ${d.agentType}`,
     `--- BEGIN MESSAGE ---\n${d.beginMessage || "(empty)"}`,
     `--- SYSTEM PROMPT ---\n${d.systemPrompt || "(empty)"}`,
   ];
+  if (d.stages.length === 0) {
+    parts.push("--- STAGES ---\n(none — single prompt agent)");
+  }
   d.stages.forEach((s, i) => {
-    parts.push(`--- STAGE ${i + 1}: ${s.name || "(unnamed)"} (id=${s.id}) ---\n${s.prompt || "(empty)"}`);
+    const trans = s.transitions.length
+      ? s.transitions
+          .map((t) => `  -> ${nameOf(t.target)}: when ${t.condition || "(no condition given)"}`)
+          .join("\n")
+      : "  (no transitions out of this stage)";
+    parts.push(
+      `--- STAGE ${i + 1}: ${s.name || "(unnamed)"} (id=${s.id}) ---\n${s.prompt || "(empty)"}\nTransitions:\n${trans}`,
+    );
   });
   return parts.join("\n\n");
 }
 
-/** Step 1: ask the user clarifying questions about their goal before suggesting anything. */
-export const coachClarify = createServerFn({ method: "POST" })
+/** Infer the objective from the prompts, then give section-by-section suggestions. */
+export const coachSuggest = createServerFn({ method: "POST" })
   .inputValidator((data) => coachSectionsSchema.parse(data))
   .handler(async ({ data }) => {
     const tools = [
       {
         type: "function",
         function: {
-          name: "emit_questions",
-          description: "Return clarifying questions plus a first-pass reading of the prompt's intent.",
-          parameters: {
-            type: "object",
-            properties: {
-              inferred_goal: { type: "string" },
-              questions: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    id: { type: "string" },
-                    question: { type: "string" },
-                    why: { type: "string" },
-                    suggested_answer: { type: "string" },
-                  },
-                  required: ["id", "question", "why", "suggested_answer"],
-                  additionalProperties: false,
-                },
-              },
-            },
-            required: ["inferred_goal", "questions"],
-            additionalProperties: false,
-          },
-        },
-      },
-    ];
-    const json = await callGateway({
-      model: "google/gemini-2.5-flash",
-      messages: [
-        {
-          role: "system",
-          content: `You are a prompt engineering coach for conversational ${data.agentType} agents.
-Before giving ANY advice you must understand what the user is trying to achieve.
-Read the current prompt configuration, state your inferred goal in one or two sentences, then ask 4-6 short, high-value clarifying questions (business objective, target user, success criteria, tone, hard constraints, what must never be said/invented, escalation rules).
-For each question provide a plausible suggested_answer inferred from the prompt so the user can accept it quickly. Do NOT propose prompt changes yet.`,
-        },
-        { role: "user", content: promptSnapshot(data) },
-      ],
-      tools,
-      tool_choice: { type: "function", function: { name: "emit_questions" } },
-    });
-    const call = json?.choices?.[0]?.message?.tool_calls?.[0];
-    const args = call ? JSON.parse(call.function.arguments) : { inferred_goal: "", questions: [] };
-    return {
-      inferredGoal: String(args.inferred_goal ?? ""),
-      questions: (args.questions ?? []).slice(0, 6) as Array<{
-        id: string;
-        question: string;
-        why: string;
-        suggested_answer: string;
-      }>,
-    };
-  });
-
-/** Step 2: goal-aligned, section-by-section suggestions. */
-export const coachSuggest = createServerFn({ method: "POST" })
-  .inputValidator((data) =>
-    coachSectionsSchema
-      .extend({
-        goal: z.string().max(4000).default(""),
-        answers: z
-          .array(
-            z.object({
-              question: z.string().max(1000),
-              answer: z.string().max(2000).default(""),
-            }),
-          )
-          .max(12)
-          .default([]),
-      })
-      .parse(data),
-  )
-  .handler(async ({ data }) => {
-    const tools = [
-      {
-        type: "function",
-        function: {
           name: "emit_suggestions",
-          description: "Return goal-aligned improvement suggestions per prompt section.",
+          description:
+            "Return the inferred objective plus goal-aligned improvement suggestions per prompt section.",
           parameters: {
             type: "object",
             properties: {
@@ -725,23 +669,17 @@ export const coachSuggest = createServerFn({ method: "POST" })
           role: "system",
           content: `You are a prompt engineering coach for conversational ${data.agentType} agents.
 
-The user's goal and answers are authoritative. NEVER suggest a change that conflicts with the stated goal, scope, tone or constraints — do not broaden scope, add capabilities, change persona, or "improve" things the user did not ask for. If a section already serves the goal, say so in verdict and return an empty suggestions list with rewritten = the current text unchanged.
+Do NOT ask the user any questions. Infer the objective, audience, tone, scope and hard constraints yourself from the configuration you are given: the begin message, the system prompt, and EVERY stage together with its transition conditions. Read the whole stage graph before judging any single section — a stage that looks incomplete alone may be correct because a later stage or transition handles it.
+
+State that inferred objective in goal_understanding (2-3 sentences, including the conversation flow across stages).
+
+Treat the inferred objective as authoritative: NEVER suggest a change that conflicts with it — do not broaden scope, add capabilities, change persona, or "improve" things outside it. If a section already serves the objective, say so in verdict, return an empty suggestions list, and set rewritten to the current text unchanged.
 
 Produce one section object for EACH of these keys, in this order: ${sectionKeys.join(", ")}.
-For each: verdict (one sentence), issues (concrete problems that hurt the goal, hallucination risk, or ${data.agentType} delivery), suggestions (each with change, why, goal_alignment explaining how it serves the stated goal), and rewritten (a complete, ready-to-paste replacement for that section that keeps the user's intent, variables like {{lead_name}}, and voice/chat suitability).
-Keep rewritten text tight and directly usable. Prefer explicit grounding/refusal rules to cut hallucination.`,
+For each: verdict (one sentence), issues (concrete problems that hurt the objective, hallucination risk, stage-handoff reliability, or ${data.agentType} delivery), suggestions (each with change, why, goal_alignment explaining how it serves the inferred objective), and rewritten (a complete, ready-to-paste replacement for that section, keeping variables like {{lead_name}} and voice/chat suitability).
+Keep rewritten text tight and directly pasteable. Prefer explicit grounding/refusal rules to cut hallucination, and make transition triggers unambiguous.`,
         },
-        {
-          role: "user",
-          content: `Stated goal / use case:
-${data.goal || "(not provided)"}
-
-Clarifying answers:
-${data.answers.map((a) => `Q: ${a.question}\nA: ${a.answer || "(no answer)"}`).join("\n\n") || "(none)"}
-
-Current configuration:
-${promptSnapshot(data)}`,
-        },
+        { role: "user", content: `Current configuration:\n${promptSnapshot(data)}` },
       ],
       tools,
       tool_choice: { type: "function", function: { name: "emit_suggestions" } },
@@ -764,3 +702,4 @@ ${promptSnapshot(data)}`,
       }>,
     };
   });
+
