@@ -108,6 +108,8 @@ export function ManualChat({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const silenceTimer = useRef<number | null>(null);
   const lastTranscript = useRef<string>("");
+  const sessionRef = useRef(false);
+
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
