@@ -144,8 +144,13 @@ export function ManualChat({
       voices.find((v) => v.lang === u.lang) ||
       voices.find((v) => v.lang.startsWith(base));
     if (preferred) u.voice = preferred;
+    if (muteWhileSpeaking) {
+      micMuted.current = true;
+      u.onend = () => { micMuted.current = false; };
+      u.onerror = () => { micMuted.current = false; };
+    }
     window.speechSynthesis.speak(u);
-  }, [recogLang, speed]);
+  }, [recogLang, speed, muteWhileSpeaking]);
 
   const speak = useCallback(
     async (text: string) => {
@@ -173,16 +178,25 @@ export function ManualChat({
         }
         const audio = new Audio(`data:${res.mime};base64,${res.audio}`);
         audioRef.current = audio;
+        if (muteWhileSpeaking) {
+          micMuted.current = true;
+          const unmute = () => { micMuted.current = false; };
+          audio.onended = unmute;
+          audio.onerror = unmute;
+          audio.onpause = unmute;
+        }
         await audio.play();
       } catch (e) {
         const msg = e instanceof Error ? e.message : "TTS failed";
         toast.warning(`Premium voice unavailable — using browser voice. (${msg.slice(0, 100)})`);
         setTtsFallback(true);
+        micMuted.current = false;
         speakBrowser(text);
       }
     },
-    [speakOutput, ttsFallback, speakBrowser, tts, voiceId, ttsModel, speed, stability, similarity, style, speakerBoost],
+    [speakOutput, ttsFallback, speakBrowser, tts, voiceId, ttsModel, speed, stability, similarity, style, speakerBoost, muteWhileSpeaking],
   );
+
 
   const stagePayload = (id: string | null) => {
     const stage = stages.find((s) => s.id === id);
