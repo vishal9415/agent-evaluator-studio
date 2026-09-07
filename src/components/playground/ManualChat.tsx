@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Mic, MicOff, Send, Volume2, VolumeX, Settings2 } from "lucide-react";
+import { Mic, PhoneOff, Send, Volume2, VolumeX, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { chatCompletion, synthesizeSpeech } from "@/lib/playground.functions";
 import { fillVariables, transitionToolName, type Stage } from "@/lib/playground-constants";
+import { CallHistory } from "@/components/playground/CallHistory";
+import { useCallHistory } from "@/lib/call-history";
 
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -81,6 +83,7 @@ export function ManualChat({
   const [voice, setVoice] = useState(agentType === "voice");
   const [listening, setListening] = useState(false);
   const [speakOutput, setSpeakOutput] = useState(agentType === "voice");
+  const [agentSpeaking, setAgentSpeaking] = useState(false);
 
   // ElevenLabs voice settings
   const [voiceId, setVoiceId] = useState(ELEVEN_VOICES[0].id);
@@ -99,6 +102,10 @@ export function ManualChat({
   const [minSpeechChars, setMinSpeechChars] = useState(2);
   const [autoSend, setAutoSend] = useState(true);
 
+  // Interruption (barge-in)
+  const [bargeIn, setBargeIn] = useState(true);
+  const [bargeThreshold, setBargeThreshold] = useState(0.06);
+
   const [ttsFallback, setTtsFallback] = useState(false);
 
   const chat = useServerFn(chatCompletion);
@@ -110,7 +117,22 @@ export function ManualChat({
   const lastTranscript = useRef<string>("");
   const sessionRef = useRef(false);
   const micMuted = useRef(false);
+  const agentSpeakingRef = useRef(false);
+  const bargeInRef = useRef(bargeIn);
+  const bargeThresholdRef = useRef(bargeThreshold);
 
+  // Mic energy monitor (used for interruption detection)
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const rafRef = useRef<number | null>(null);
+
+  const { calls, activeId, startCall, addEvent, endCall, clearHistory } = useCallHistory();
+  const callIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    bargeInRef.current = bargeIn;
+    bargeThresholdRef.current = bargeThreshold;
+  }, [bargeIn, bargeThreshold]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -131,6 +153,91 @@ export function ManualChat({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [beginMessage]);
 
+  const ensureCall = useCallback(
+    (mode: "voice" | "chat") => {
+      if (callIdRef.current) return callIdRef.current;
+      const id = startCall(mode, model);
+      callIdRef.current = id;
+      return id;
+    },
+    [startCall, model],
+  );
+
+  const log = useCallback(
+    (kind: "user" | "agent" | "stage" | "system", text: string) => {
+      addEvent(callIdRef.current, kind, text);
+    },
+    [addEvent],
+  );
+
+  const stopAgentSpeech = useCallback((reason?: "interrupted") => {
+    if (audioRef.current) {
+      try {
+        audioRef.current.pause();
+      } catch {
+        /* noop */
+      }
+    }
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    agentSpeakingRef.current = false;
+    micMuted.current = false;
+    lastTranscript.current = "";
+    setAgentSpeaking(false);
+    if (reason === "interrupted") addEvent(callIdRef.current, "system", "Caller interrupted — agent stopped speaking");
+  }, [addEvent]);
+
+  // Continuous mic level monitor: detects the caller talking over the agent.
+  const startMicMonitor = useCallback(async () => {
+    if (typeof window === "undefined" || audioCtxRef.current) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      micStreamRef.current = stream;
+      const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx = new Ctx();
+      audioCtxRef.current = ctx;
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      source.connect(analyser);
+      const buf = new Float32Array(analyser.fftSize);
+      let loud = 0;
+
+      const tick = () => {
+        analyser.getFloatTimeDomainData(buf);
+        let sum = 0;
+        for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+        const rms = Math.sqrt(sum / buf.length);
+        if (agentSpeakingRef.current && bargeInRef.current && rms > bargeThresholdRef.current) {
+          loud += 1;
+          if (loud >= 3) {
+            loud = 0;
+            stopAgentSpeech("interrupted");
+          }
+        } else if (rms <= bargeThresholdRef.current) {
+          loud = 0;
+        }
+        rafRef.current = window.requestAnimationFrame(tick);
+      };
+      rafRef.current = window.requestAnimationFrame(tick);
+    } catch {
+      /* monitoring is optional — recognition still works */
+    }
+  }, [stopAgentSpeech]);
+
+  const stopMicMonitor = useCallback(() => {
+    if (rafRef.current !== null) {
+      window.cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    micStreamRef.current?.getTracks().forEach((t) => t.stop());
+    micStreamRef.current = null;
+    void audioCtxRef.current?.close().catch(() => {});
+    audioCtxRef.current = null;
+  }, []);
 
   const speakBrowser = useCallback((text: string) => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
@@ -145,11 +252,17 @@ export function ManualChat({
       voices.find((v) => v.lang === u.lang) ||
       voices.find((v) => v.lang.startsWith(base));
     if (preferred) u.voice = preferred;
-    if (muteWhileSpeaking) {
-      micMuted.current = true;
-      u.onend = () => { micMuted.current = false; };
-      u.onerror = () => { micMuted.current = false; };
-    }
+    agentSpeakingRef.current = true;
+    setAgentSpeaking(true);
+    if (muteWhileSpeaking) micMuted.current = true;
+    const done = () => {
+      agentSpeakingRef.current = false;
+      micMuted.current = false;
+      lastTranscript.current = "";
+      setAgentSpeaking(false);
+    };
+    u.onend = done;
+    u.onerror = done;
     window.speechSynthesis.speak(u);
   }, [recogLang, speed, muteWhileSpeaking]);
 
@@ -179,13 +292,18 @@ export function ManualChat({
         }
         const audio = new Audio(`data:${res.mime};base64,${res.audio}`);
         audioRef.current = audio;
-        if (muteWhileSpeaking) {
-          micMuted.current = true;
-          const unmute = () => { micMuted.current = false; };
-          audio.onended = unmute;
-          audio.onerror = unmute;
-          audio.onpause = unmute;
-        }
+        agentSpeakingRef.current = true;
+        setAgentSpeaking(true);
+        if (muteWhileSpeaking) micMuted.current = true;
+        const done = () => {
+          agentSpeakingRef.current = false;
+          micMuted.current = false;
+          lastTranscript.current = "";
+          setAgentSpeaking(false);
+        };
+        audio.onended = done;
+        audio.onerror = done;
+        audio.onpause = done;
         await audio.play();
       } catch (e) {
         const msg = e instanceof Error ? e.message : "TTS failed";
@@ -221,6 +339,9 @@ export function ManualChat({
   const send = async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || loading) return;
+    // A typed message outside a voice call still belongs to a logged session.
+    ensureCall(listening ? "voice" : "chat");
+    log("user", trimmed);
     const next: Msg[] = [...messages, { role: "user", content: trimmed }];
     setMessages(next);
     setInput("");
@@ -241,6 +362,7 @@ export function ManualChat({
           role: "assistant",
           content: `→ Moved to stage "${res.moveTo.name}"${res.moveTo.reason ? `: ${res.moveTo.reason}` : ""}`,
         });
+        log("stage", `Moved to "${res.moveTo.name}"${res.moveTo.reason ? `: ${res.moveTo.reason}` : ""}`);
         setMessages(history);
         if (!res.content) {
           res = await chat({
@@ -256,6 +378,7 @@ export function ManualChat({
 
       const reply = res.content || "(empty response)";
       setMessages([...history, { role: "assistant", content: reply }]);
+      log("agent", reply);
       void speak(reply);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Chat failed");
@@ -284,7 +407,8 @@ export function ManualChat({
     lastTranscript.current = "";
 
     rec.onresult = (ev: any) => {
-      if (micMuted.current) return;
+      // Ignore anything captured while the agent's own voice is playing.
+      if (micMuted.current || agentSpeakingRef.current) return;
       const transcript = Array.from(ev.results)
         .slice(ev.resultIndex)
         .map((r: any) => r[0].transcript)
@@ -342,43 +466,63 @@ export function ManualChat({
     sessionRef.current = true;
     if (beginRecognition()) {
       setListening(true);
-      toast.success("Mic live — speak any time. Click again to end the call.");
+      void startMicMonitor();
+      const id = ensureCall("voice");
+      addEvent(id, "system", "Call started");
+      toast.success("Call live — speak any time. Use End call to hang up.");
     } else {
       sessionRef.current = false;
       toast.error("Could not start mic");
     }
   };
 
-  const stopListening = () => {
+  const hangUp = (options?: { sendPending?: boolean }) => {
     sessionRef.current = false;
     clearSilence();
     try { recRef.current?.stop(); } catch { /* noop */ }
     recRef.current = null;
     setListening(false);
+    stopAgentSpeech();
+    stopMicMonitor();
     const utterance = lastTranscript.current.trim();
     lastTranscript.current = "";
-    if (autoSend && utterance.length >= minSpeechChars) {
-      send(utterance);
+    if (options?.sendPending && autoSend && utterance.length >= minSpeechChars) {
+      void send(utterance);
     }
+    if (callIdRef.current) {
+      addEvent(callIdRef.current, "system", "Call ended");
+      endCall(callIdRef.current);
+      callIdRef.current = null;
+    }
+    toast.info("Call ended");
   };
 
   useEffect(() => {
     return () => {
       sessionRef.current = false;
       try { recRef.current?.stop(); } catch { /* noop */ }
+      stopMicMonitor();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
 
   const selectedVoice = ELEVEN_VOICES.find((v) => v.id === voiceId);
 
   return (
-    <div className="flex h-[600px] flex-col rounded-lg border bg-card">
+    <div>
+      <div className="flex h-[600px] flex-col rounded-lg border bg-card">
       <div className="flex items-center justify-between border-b px-4 py-2">
         <div className="text-sm text-muted-foreground">
           Manual chat · <span className="font-mono">{model}</span>
           {selectedVoice && speakOutput && (
             <span className="ml-2 text-xs text-emerald-600">♪ {selectedVoice.name}</span>
+          )}
+          {listening && (
+            <span className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+              {agentSpeaking ? "Agent speaking — talk to interrupt" : "Listening"}
+            </span>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -469,6 +613,34 @@ export function ManualChat({
                     <div className="flex items-center justify-between"><Label className="text-xs">Auto-send on silence</Label><Switch checked={autoSend} onCheckedChange={setAutoSend} /></div>
                   </div>
                 </div>
+
+                <Separator />
+
+                <div>
+                  <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Interruption</div>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">Allow barge-in (talk over agent)</Label>
+                      <Switch checked={bargeIn} onCheckedChange={setBargeIn} />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs">
+                        <Label>Interrupt sensitivity</Label>
+                        <span className="text-muted-foreground">{bargeThreshold.toFixed(3)}</span>
+                      </div>
+                      <Slider
+                        value={[bargeThreshold]}
+                        min={0.01}
+                        max={0.2}
+                        step={0.005}
+                        onValueChange={(v) => setBargeThreshold(v[0])}
+                      />
+                      <p className="mt-1 text-[10px] text-muted-foreground">
+                        Lower = interrupts more easily. Raise it if room noise cuts the agent off.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </PopoverContent>
           </Popover>
@@ -489,7 +661,7 @@ export function ManualChat({
       <ScrollArea className="flex-1 p-4">
         {messages.length === 0 ? (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            Send a message{voice ? " or hold the mic" : ""} to start.
+            Send a message{voice ? " or start a call" : ""} to start.
           </div>
         ) : (
           <div className="space-y-3">
@@ -518,16 +690,45 @@ export function ManualChat({
 
       <div className="flex items-end gap-2 border-t p-3">
         {voice && (
-          <Button
-            type="button"
-            variant={listening ? "destructive" : "outline"}
-            size="icon"
-            onClick={listening ? stopListening : startListening}
-            disabled={loading}
-            title={listening ? "Stop" : "Record"}
-          >
-            {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-          </Button>
+          <>
+            {listening ? (
+              <>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => hangUp({ sendPending: false })}
+                  title="End the call"
+                >
+                  <PhoneOff className="mr-1.5 h-4 w-4" />
+                  End call
+                </Button>
+                {agentSpeaking && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => stopAgentSpeech("interrupted")}
+                    title="Interrupt the agent"
+                  >
+                    Interrupt
+                  </Button>
+                )}
+              </>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={startListening}
+                disabled={loading}
+                title="Start a call"
+              >
+                <Mic className="mr-1.5 h-4 w-4" />
+                Start call
+              </Button>
+            )}
+          </>
         )}
         <Textarea
           value={input}
@@ -546,6 +747,9 @@ export function ManualChat({
           <Send className="h-4 w-4" />
         </Button>
       </div>
+      </div>
+
+      <CallHistory calls={calls} activeId={activeId} onClear={clearHistory} />
     </div>
   );
 }
