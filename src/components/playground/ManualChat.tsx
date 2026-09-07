@@ -109,6 +109,7 @@ export function ManualChat({
   const silenceTimer = useRef<number | null>(null);
   const lastTranscript = useRef<string>("");
   const sessionRef = useRef(false);
+  const micMuted = useRef(false);
 
 
   useEffect(() => {
@@ -283,6 +284,7 @@ export function ManualChat({
     lastTranscript.current = "";
 
     rec.onresult = (ev: any) => {
+      if (micMuted.current) return;
       const transcript = Array.from(ev.results)
         .slice(ev.resultIndex)
         .map((r: any) => r[0].transcript)
