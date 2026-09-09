@@ -280,14 +280,15 @@ export function ManualChat({
     agentSpeakingRef.current = true;
     setAgentSpeaking(true);
     micMuted.current = true;
-    try { recRef.current?.abort(); } catch { /* recognition may already be stopped */ }
+    // Keep recognition running — micMuted filters out the agent's own voice,
+    // so the caller's first words after an interruption are never lost.
     const done = () => {
       if (speechEpoch !== speechEpochRef.current) return;
       agentSpeakingRef.current = false;
       micMuted.current = false;
       lastTranscript.current = "";
       setAgentSpeaking(false);
-      resumeRecognition();
+      resumeRecognition(300);
     };
     u.onend = done;
     u.onerror = done;
@@ -325,7 +326,6 @@ export function ManualChat({
         agentSpeakingRef.current = true;
         setAgentSpeaking(true);
         micMuted.current = true;
-        try { recRef.current?.abort(); } catch { /* recognition may already be stopped */ }
         const done = () => {
           if (speechEpoch !== speechEpochRef.current) return;
           audioRef.current = null;
