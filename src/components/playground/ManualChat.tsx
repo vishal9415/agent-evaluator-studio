@@ -333,7 +333,7 @@ export function ManualChat({
           micMuted.current = false;
           lastTranscript.current = "";
           setAgentSpeaking(false);
-          resumeRecognition();
+          resumeRecognition(300);
         };
         audio.onended = done;
         audio.onerror = done;
@@ -474,15 +474,14 @@ export function ManualChat({
     };
     rec.onend = () => {
       clearSilence();
-       if (sessionRef.current && !agentSpeakingRef.current) {
+      if (sessionRef.current && !agentSpeakingRef.current) {
         // keep the mic live for the whole call
         window.setTimeout(() => {
           if (!sessionRef.current) return;
           try { rec.start(); } catch { /* already started */ }
         }, 250);
-      } else {
-        setListening(false);
       }
+      // Never flip the call UI off here — only End call (hangUp) does that.
     };
     recRef.current = rec;
     try {
