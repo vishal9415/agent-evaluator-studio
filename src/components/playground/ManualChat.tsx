@@ -82,6 +82,7 @@ export function ManualChat({
   const [loading, setLoading] = useState(false);
   const [voice, setVoice] = useState(agentType === "voice");
   const [listening, setListening] = useState(false);
+  const [callLive, setCallLive] = useState(false);
   const [speakOutput, setSpeakOutput] = useState(agentType === "voice");
   const [agentSpeaking, setAgentSpeaking] = useState(false);
 
@@ -201,10 +202,13 @@ export function ManualChat({
     }
     agentSpeakingRef.current = false;
     micMuted.current = false;
-    lastTranscript.current = "";
-    setInput("");
+    if (reason !== "interrupted") {
+      // Keep a partial interruption transcript so the caller doesn't have to rephrase.
+      lastTranscript.current = "";
+      setInput("");
+    }
     setAgentSpeaking(false);
-    if (sessionRef.current) resumeRecognition();
+    if (sessionRef.current) resumeRecognition(300);
     if (reason === "interrupted") addEvent(callIdRef.current, "system", "Caller interrupted — agent stopped speaking");
   }, [addEvent, resumeRecognition]);
 
