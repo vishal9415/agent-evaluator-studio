@@ -118,6 +118,8 @@ export function ManualChat({
   const sessionRef = useRef(false);
   const micMuted = useRef(false);
   const agentSpeakingRef = useRef(false);
+  const speechEpochRef = useRef(0);
+  const suppressRecognitionUntilRef = useRef(0);
   const bargeInRef = useRef(bargeIn);
   const bargeThresholdRef = useRef(bargeThreshold);
 
@@ -170,10 +172,26 @@ export function ManualChat({
     [addEvent],
   );
 
+  const resumeRecognition = useCallback((delay = 650) => {
+    suppressRecognitionUntilRef.current = Date.now() + delay;
+    window.setTimeout(() => {
+      if (!sessionRef.current || agentSpeakingRef.current || !recRef.current) return;
+      try { recRef.current.start(); } catch { /* already started */ }
+    }, delay);
+  }, []);
+
   const stopAgentSpeech = useCallback((reason?: "interrupted") => {
-    if (audioRef.current) {
+    speechEpochRef.current += 1;
+    const currentAudio = audioRef.current;
+    audioRef.current = null;
+    if (currentAudio) {
       try {
-        audioRef.current.pause();
+        currentAudio.onended = null;
+        currentAudio.onerror = null;
+        currentAudio.onpause = null;
+        currentAudio.pause();
+        currentAudio.removeAttribute("src");
+        currentAudio.load();
       } catch {
         /* noop */
       }
@@ -184,9 +202,11 @@ export function ManualChat({
     agentSpeakingRef.current = false;
     micMuted.current = false;
     lastTranscript.current = "";
+    setInput("");
     setAgentSpeaking(false);
+    if (sessionRef.current) resumeRecognition();
     if (reason === "interrupted") addEvent(callIdRef.current, "system", "Caller interrupted — agent stopped speaking");
-  }, [addEvent]);
+  }, [addEvent, resumeRecognition]);
 
   // Continuous mic level monitor: detects the caller talking over the agent.
   const startMicMonitor = useCallback(async () => {
@@ -241,6 +261,7 @@ export function ManualChat({
 
   const speakBrowser = useCallback((text: string) => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
+    const speechEpoch = ++speechEpochRef.current;
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = recogLang || "en-US";
@@ -254,17 +275,20 @@ export function ManualChat({
     if (preferred) u.voice = preferred;
     agentSpeakingRef.current = true;
     setAgentSpeaking(true);
-    if (muteWhileSpeaking) micMuted.current = true;
+    micMuted.current = true;
+    try { recRef.current?.abort(); } catch { /* recognition may already be stopped */ }
     const done = () => {
+      if (speechEpoch !== speechEpochRef.current) return;
       agentSpeakingRef.current = false;
       micMuted.current = false;
       lastTranscript.current = "";
       setAgentSpeaking(false);
+      resumeRecognition();
     };
     u.onend = done;
     u.onerror = done;
     window.speechSynthesis.speak(u);
-  }, [recogLang, speed, muteWhileSpeaking]);
+  }, [recogLang, speed, resumeRecognition]);
 
   const speak = useCallback(
     async (text: string) => {
@@ -273,6 +297,7 @@ export function ManualChat({
         speakBrowser(text);
         return;
       }
+      const speechEpoch = ++speechEpochRef.current;
       try {
         const res = await tts({
           data: {
@@ -286,6 +311,7 @@ export function ManualChat({
             useSpeakerBoost: speakerBoost,
           },
         });
+        if (speechEpoch !== speechEpochRef.current) return;
         if (audioRef.current) {
           audioRef.current.pause();
           audioRef.current.src = "";
@@ -294,18 +320,23 @@ export function ManualChat({
         audioRef.current = audio;
         agentSpeakingRef.current = true;
         setAgentSpeaking(true);
-        if (muteWhileSpeaking) micMuted.current = true;
+        micMuted.current = true;
+        try { recRef.current?.abort(); } catch { /* recognition may already be stopped */ }
         const done = () => {
+          if (speechEpoch !== speechEpochRef.current) return;
+          audioRef.current = null;
           agentSpeakingRef.current = false;
           micMuted.current = false;
           lastTranscript.current = "";
           setAgentSpeaking(false);
+          resumeRecognition();
         };
         audio.onended = done;
         audio.onerror = done;
         audio.onpause = done;
         await audio.play();
       } catch (e) {
+        if (speechEpoch !== speechEpochRef.current) return;
         const msg = e instanceof Error ? e.message : "TTS failed";
         toast.warning(`Premium voice unavailable — using browser voice. (${msg.slice(0, 100)})`);
         setTtsFallback(true);
@@ -313,7 +344,7 @@ export function ManualChat({
         speakBrowser(text);
       }
     },
-    [speakOutput, ttsFallback, speakBrowser, tts, voiceId, ttsModel, speed, stability, similarity, style, speakerBoost, muteWhileSpeaking],
+    [speakOutput, ttsFallback, speakBrowser, tts, voiceId, ttsModel, speed, stability, similarity, style, speakerBoost, resumeRecognition],
   );
 
 
@@ -346,6 +377,7 @@ export function ManualChat({
     setMessages(next);
     setInput("");
     setLoading(true);
+    const callAtSend = callIdRef.current;
     try {
       const filledSystem = fillVariables(systemPrompt, variables);
       let activeStage = stageId;
@@ -379,7 +411,7 @@ export function ManualChat({
       const reply = res.content || "(empty response)";
       setMessages([...history, { role: "assistant", content: reply }]);
       log("agent", reply);
-      void speak(reply);
+      if (!voice || (sessionRef.current && callIdRef.current === callAtSend)) void speak(reply);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Chat failed");
       setMessages(messages);
@@ -408,7 +440,7 @@ export function ManualChat({
 
     rec.onresult = (ev: any) => {
       // Ignore anything captured while the agent's own voice is playing.
-      if (micMuted.current || agentSpeakingRef.current) return;
+      if (micMuted.current || agentSpeakingRef.current || Date.now() < suppressRecognitionUntilRef.current) return;
       const transcript = Array.from(ev.results)
         .slice(ev.resultIndex)
         .map((r: any) => r[0].transcript)
@@ -438,7 +470,7 @@ export function ManualChat({
     };
     rec.onend = () => {
       clearSilence();
-      if (sessionRef.current) {
+       if (sessionRef.current && !agentSpeakingRef.current) {
         // keep the mic live for the whole call
         window.setTimeout(() => {
           if (!sessionRef.current) return;
@@ -478,8 +510,9 @@ export function ManualChat({
 
   const hangUp = (options?: { sendPending?: boolean }) => {
     sessionRef.current = false;
+    speechEpochRef.current += 1;
     clearSilence();
-    try { recRef.current?.stop(); } catch { /* noop */ }
+    try { recRef.current?.abort(); } catch { /* noop */ }
     recRef.current = null;
     setListening(false);
     stopAgentSpeech();
