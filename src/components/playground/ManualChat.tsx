@@ -82,6 +82,7 @@ export function ManualChat({
   const [loading, setLoading] = useState(false);
   const [voice, setVoice] = useState(agentType === "voice");
   const [listening, setListening] = useState(false);
+  const [callLive, setCallLive] = useState(false);
   const [speakOutput, setSpeakOutput] = useState(agentType === "voice");
   const [agentSpeaking, setAgentSpeaking] = useState(false);
 
@@ -201,10 +202,13 @@ export function ManualChat({
     }
     agentSpeakingRef.current = false;
     micMuted.current = false;
-    lastTranscript.current = "";
-    setInput("");
+    if (reason !== "interrupted") {
+      // Keep a partial interruption transcript so the caller doesn't have to rephrase.
+      lastTranscript.current = "";
+      setInput("");
+    }
     setAgentSpeaking(false);
-    if (sessionRef.current) resumeRecognition();
+    if (sessionRef.current) resumeRecognition(300);
     if (reason === "interrupted") addEvent(callIdRef.current, "system", "Caller interrupted — agent stopped speaking");
   }, [addEvent, resumeRecognition]);
 
@@ -276,14 +280,15 @@ export function ManualChat({
     agentSpeakingRef.current = true;
     setAgentSpeaking(true);
     micMuted.current = true;
-    try { recRef.current?.abort(); } catch { /* recognition may already be stopped */ }
+    // Keep recognition running — micMuted filters out the agent's own voice,
+    // so the caller's first words after an interruption are never lost.
     const done = () => {
       if (speechEpoch !== speechEpochRef.current) return;
       agentSpeakingRef.current = false;
       micMuted.current = false;
       lastTranscript.current = "";
       setAgentSpeaking(false);
-      resumeRecognition();
+      resumeRecognition(300);
     };
     u.onend = done;
     u.onerror = done;
@@ -321,7 +326,6 @@ export function ManualChat({
         agentSpeakingRef.current = true;
         setAgentSpeaking(true);
         micMuted.current = true;
-        try { recRef.current?.abort(); } catch { /* recognition may already be stopped */ }
         const done = () => {
           if (speechEpoch !== speechEpochRef.current) return;
           audioRef.current = null;
@@ -329,7 +333,7 @@ export function ManualChat({
           micMuted.current = false;
           lastTranscript.current = "";
           setAgentSpeaking(false);
-          resumeRecognition();
+          resumeRecognition(300);
         };
         audio.onended = done;
         audio.onerror = done;
@@ -470,15 +474,14 @@ export function ManualChat({
     };
     rec.onend = () => {
       clearSilence();
-       if (sessionRef.current && !agentSpeakingRef.current) {
+      if (sessionRef.current && !agentSpeakingRef.current) {
         // keep the mic live for the whole call
         window.setTimeout(() => {
           if (!sessionRef.current) return;
           try { rec.start(); } catch { /* already started */ }
         }, 250);
-      } else {
-        setListening(false);
       }
+      // Never flip the call UI off here — only End call (hangUp) does that.
     };
     recRef.current = rec;
     try {
@@ -498,6 +501,7 @@ export function ManualChat({
     sessionRef.current = true;
     if (beginRecognition()) {
       setListening(true);
+      setCallLive(true);
       void startMicMonitor();
       const id = ensureCall("voice");
       addEvent(id, "system", "Call started");
@@ -515,6 +519,7 @@ export function ManualChat({
     try { recRef.current?.abort(); } catch { /* noop */ }
     recRef.current = null;
     setListening(false);
+    setCallLive(false);
     stopAgentSpeech();
     stopMicMonitor();
     const utterance = lastTranscript.current.trim();
@@ -551,7 +556,7 @@ export function ManualChat({
           {selectedVoice && speakOutput && (
             <span className="ml-2 text-xs text-emerald-600">♪ {selectedVoice.name}</span>
           )}
-          {listening && (
+          {callLive && (
             <span className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
               {agentSpeaking ? "Agent speaking — talk to interrupt" : "Listening"}
@@ -724,7 +729,7 @@ export function ManualChat({
       <div className="flex items-end gap-2 border-t p-3">
         {voice && (
           <>
-            {listening ? (
+            {callLive ? (
               <>
                 <Button
                   type="button"
