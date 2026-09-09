@@ -501,6 +501,7 @@ export function ManualChat({
     sessionRef.current = true;
     if (beginRecognition()) {
       setListening(true);
+      setCallLive(true);
       void startMicMonitor();
       const id = ensureCall("voice");
       addEvent(id, "system", "Call started");
@@ -518,6 +519,7 @@ export function ManualChat({
     try { recRef.current?.abort(); } catch { /* noop */ }
     recRef.current = null;
     setListening(false);
+    setCallLive(false);
     stopAgentSpeech();
     stopMicMonitor();
     const utterance = lastTranscript.current.trim();
@@ -554,7 +556,7 @@ export function ManualChat({
           {selectedVoice && speakOutput && (
             <span className="ml-2 text-xs text-emerald-600">♪ {selectedVoice.name}</span>
           )}
-          {listening && (
+          {callLive && (
             <span className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
               {agentSpeaking ? "Agent speaking — talk to interrupt" : "Listening"}
@@ -727,7 +729,7 @@ export function ManualChat({
       <div className="flex items-end gap-2 border-t p-3">
         {voice && (
           <>
-            {listening ? (
+            {callLive ? (
               <>
                 <Button
                   type="button"
