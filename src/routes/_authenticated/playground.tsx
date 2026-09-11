@@ -31,7 +31,7 @@ import { AutoEval } from "@/components/playground/AutoEval";
 import { StagesEditor } from "@/components/playground/StagesEditor";
 import { PromptCoach } from "@/components/playground/PromptCoach";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_authenticated/playground")({
   head: () => ({
     meta: [
       { title: "Agent Playground — Test conversational prompts" },

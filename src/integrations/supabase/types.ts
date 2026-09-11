@@ -73,6 +73,36 @@ export type Database = {
           },
         ]
       }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          company: string | null
+          created_at: string
+          display_name: string | null
+          email: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          company?: string | null
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          company?: string | null
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       prompts: {
         Row: {
           agent_type: string
@@ -84,6 +114,7 @@ export type Database = {
           stages: Json
           system_prompt: string
           updated_at: string
+          user_id: string | null
           variables: Json
         }
         Insert: {
@@ -96,6 +127,7 @@ export type Database = {
           stages?: Json
           system_prompt?: string
           updated_at?: string
+          user_id?: string | null
           variables?: Json
         }
         Update: {
@@ -108,6 +140,7 @@ export type Database = {
           stages?: Json
           system_prompt?: string
           updated_at?: string
+          user_id?: string | null
           variables?: Json
         }
         Relationships: []
