@@ -121,8 +121,10 @@ export function ManualChat({
   const agentSpeakingRef = useRef(false);
   const speechEpochRef = useRef(0);
   const suppressRecognitionUntilRef = useRef(0);
+  const lastAgentSpeechRef = useRef("");
+  const echoGuardUntilRef = useRef(0);
   const bargeInRef = useRef(bargeIn);
-  const bargeThresholdRef = useRef(bargeThreshold);
+  const muteWhileSpeakingRef = useRef(muteWhileSpeaking);
 
   // Mic energy monitor (used for interruption detection)
   const micStreamRef = useRef<MediaStream | null>(null);
@@ -134,8 +136,8 @@ export function ManualChat({
 
   useEffect(() => {
     bargeInRef.current = bargeIn;
-    bargeThresholdRef.current = bargeThreshold;
-  }, [bargeIn, bargeThreshold]);
+    muteWhileSpeakingRef.current = muteWhileSpeaking;
+  }, [bargeIn, muteWhileSpeaking]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -202,6 +204,7 @@ export function ManualChat({
     }
     agentSpeakingRef.current = false;
     micMuted.current = false;
+    echoGuardUntilRef.current = Date.now() + 1800;
     if (reason !== "interrupted") {
       // Keep a partial interruption transcript so the caller doesn't have to rephrase.
       lastTranscript.current = "";
@@ -212,7 +215,9 @@ export function ManualChat({
     if (reason === "interrupted") addEvent(callIdRef.current, "system", "Caller interrupted — agent stopped speaking");
   }, [addEvent, resumeRecognition]);
 
-  // Continuous mic level monitor: detects the caller talking over the agent.
+  // Keep an echo-cancelled mic stream active for the call. Interruption is
+  // decided from recognized words below, not raw volume: speaker output can
+  // raise mic volume and falsely interrupt itself on laptop speakers.
   const startMicMonitor = useCallback(async () => {
     if (typeof window === "undefined" || audioCtxRef.current) return;
     try {
@@ -223,34 +228,11 @@ export function ManualChat({
       const Ctx = window.AudioContext || (window as any).webkitAudioContext;
       const ctx = new Ctx();
       audioCtxRef.current = ctx;
-      const source = ctx.createMediaStreamSource(stream);
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 1024;
-      source.connect(analyser);
-      const buf = new Float32Array(analyser.fftSize);
-      let loud = 0;
-
-      const tick = () => {
-        analyser.getFloatTimeDomainData(buf);
-        let sum = 0;
-        for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
-        const rms = Math.sqrt(sum / buf.length);
-        if (agentSpeakingRef.current && bargeInRef.current && rms > bargeThresholdRef.current) {
-          loud += 1;
-          if (loud >= 3) {
-            loud = 0;
-            stopAgentSpeech("interrupted");
-          }
-        } else if (rms <= bargeThresholdRef.current) {
-          loud = 0;
-        }
-        rafRef.current = window.requestAnimationFrame(tick);
-      };
-      rafRef.current = window.requestAnimationFrame(tick);
+      ctx.createMediaStreamSource(stream);
     } catch {
       /* monitoring is optional — recognition still works */
     }
-  }, [stopAgentSpeech]);
+  }, []);
 
   const stopMicMonitor = useCallback(() => {
     if (rafRef.current !== null) {
@@ -266,6 +248,8 @@ export function ManualChat({
   const speakBrowser = useCallback((text: string) => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
     const speechEpoch = ++speechEpochRef.current;
+    lastAgentSpeechRef.current = text;
+    echoGuardUntilRef.current = Number.POSITIVE_INFINITY;
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = recogLang || "en-US";
@@ -286,6 +270,7 @@ export function ManualChat({
       if (speechEpoch !== speechEpochRef.current) return;
       agentSpeakingRef.current = false;
       micMuted.current = false;
+      echoGuardUntilRef.current = Date.now() + 1800;
       lastTranscript.current = "";
       setAgentSpeaking(false);
       resumeRecognition(300);
@@ -303,6 +288,8 @@ export function ManualChat({
         return;
       }
       const speechEpoch = ++speechEpochRef.current;
+      lastAgentSpeechRef.current = text;
+      echoGuardUntilRef.current = Number.POSITIVE_INFINITY;
       try {
         const res = await tts({
           data: {
@@ -331,6 +318,7 @@ export function ManualChat({
           audioRef.current = null;
           agentSpeakingRef.current = false;
           micMuted.current = false;
+          echoGuardUntilRef.current = Date.now() + 1800;
           lastTranscript.current = "";
           setAgentSpeaking(false);
           resumeRecognition(300);
@@ -432,6 +420,25 @@ export function ManualChat({
     }
   };
 
+  const isAgentEcho = (transcript: string) => {
+    if (Date.now() > echoGuardUntilRef.current) return false;
+    const words = (value: string) =>
+      value
+        .toLocaleLowerCase()
+        .replace(/[^\p{L}\p{N}\s]/gu, " ")
+        .split(/\s+/)
+        .filter((word) => word.length > 1);
+    const heard = words(transcript);
+    const spoken = words(lastAgentSpeechRef.current);
+    if (!heard.length || !spoken.length) return false;
+    const spokenSet = new Set(spoken);
+    const matching = heard.filter((word) => spokenSet.has(word)).length;
+    const overlap = matching / heard.length;
+    const heardPhrase = heard.join(" ");
+    const spokenPhrase = spoken.join(" ");
+    return spokenPhrase.includes(heardPhrase) || overlap >= 0.72;
+  };
+
   const beginRecognition = () => {
     const w = window as AnyWindow;
     const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
@@ -443,14 +450,22 @@ export function ManualChat({
     lastTranscript.current = "";
 
     rec.onresult = (ev: any) => {
-      // Ignore anything captured while the agent's own voice is playing.
-      if (micMuted.current || agentSpeakingRef.current || Date.now() < suppressRecognitionUntilRef.current) return;
       const transcript = Array.from(ev.results)
         .slice(ev.resultIndex)
         .map((r: any) => r[0].transcript)
         .join(" ")
         .trim();
       if (!transcript) return;
+      // Browsers can deliver speaker audio after playback has ended. Reject
+      // words matching the latest agent response rather than reopening the mic
+      // on raw room volume. Distinct caller speech still interrupts immediately.
+      if (isAgentEcho(transcript)) return;
+      if (agentSpeakingRef.current || micMuted.current) {
+        if (!bargeInRef.current || muteWhileSpeakingRef.current) return;
+        stopAgentSpeech("interrupted");
+      } else if (Date.now() < suppressRecognitionUntilRef.current) {
+        return;
+      }
       lastTranscript.current = transcript;
       setInput(transcript);
 
