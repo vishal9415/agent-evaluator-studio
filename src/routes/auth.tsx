@@ -67,29 +67,10 @@ function AuthPage() {
         <div className="space-y-1 text-center">
           <Link to="/" className="text-sm font-semibold text-muted-foreground">PromptLab</Link>
           <h1 className="text-2xl font-semibold text-foreground">
-            {mode === "signin" ? "Welcome back" : "Create your account"}
+            Sign in or create an account
           </h1>
         </div>
-        <Button variant="outline" className="w-full" onClick={google}>Continue with Google</Button>
-        <form onSubmit={submit} className="space-y-3">
-          <div className="space-y-1">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="password">Password</Label>
-            <Input id="password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
-          </div>
-          <Button type="submit" className="w-full" disabled={busy}>
-            {mode === "signin" ? "Sign in" : "Sign up"}
-          </Button>
-        </form>
-        <button
-          className="w-full text-center text-sm text-muted-foreground hover:text-foreground"
-          onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-        >
-          {mode === "signin" ? "No account? Sign up" : "Have an account? Sign in"}
-        </button>
+        <Button className="w-full" onClick={google}>Continue with Google</Button>
       </div>
     </div>
   );
