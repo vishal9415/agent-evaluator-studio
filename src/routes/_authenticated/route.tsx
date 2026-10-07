@@ -1,34 +1,41 @@
-// Auto-injected by the Supabase integration when this file does not exist.
-//
-// Pathless layout route that gates every child under `src/routes/_authenticated/`
-// behind a signed-in Supabase user. The subtree is client-rendered (`ssr: false`)
-// because Supabase stores the session in `localStorage`, which the server cannot
-// read. Trying to gate this subtree server-side produces redirect loops or
-// false sign-out flashes on hard refresh.
-//
-// Public pages and `/auth` continue to SSR normally — they do not import this
-// layout and are not affected.
-//
-// Data fetching inside this subtree should call `createServerFn`s protected by
-// `requireSupabaseAuth`. The browser attaches the bearer token automatically
-// via `attachSupabaseAuth`, which is registered as `functionMiddleware` in
-// `src/start.ts` (auto-wired by the integration).
-//
-// Edit freely. This file is only re-injected when deleted entirely.
-import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
+import { createFileRoute, Link, Outlet, redirect, useNavigate } from '@tanstack/react-router'
 import { supabase } from '@/integrations/supabase/client'
-
-// Lovable's Supabase auth scaffolds use `/auth`; change this if the app uses another sign-in route.
-const SIGN_IN_ROUTE = '/auth'
+import { Button } from '@/components/ui/button'
 
 export const Route = createFileRoute('/_authenticated')({
   ssr: false,
   beforeLoad: async () => {
     const { data, error } = await supabase.auth.getUser()
     if (error || !data.user) {
-      throw redirect({ to: SIGN_IN_ROUTE })
+      throw redirect({ to: '/auth' })
     }
     return { user: data.user }
   },
-  component: () => <Outlet />,
+  component: Layout,
 })
+
+function Layout() {
+  const navigate = useNavigate()
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="flex items-center justify-between border-b border-border px-6 py-3">
+        <nav className="flex items-center gap-4 text-sm">
+          <Link to="/" className="font-semibold text-foreground">PromptLab</Link>
+          <Link to="/playground" className="text-muted-foreground" activeProps={{ className: 'text-foreground' }}>Playground</Link>
+          <Link to="/guardrails" className="text-muted-foreground" activeProps={{ className: 'text-foreground' }}>Guardrails</Link>
+        </nav>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={async () => {
+            await supabase.auth.signOut()
+            navigate({ to: '/' })
+          }}
+        >
+          Sign out
+        </Button>
+      </header>
+      <Outlet />
+    </div>
+  )
+}
