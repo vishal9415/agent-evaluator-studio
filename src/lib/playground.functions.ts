@@ -16,7 +16,7 @@ async function acquireSlot() {
   if (wait > 0) await new Promise((r) => setTimeout(r, wait));
 }
 
-async function callGateway(body: Record<string, unknown>, attempt = 0): Promise<any> {
+export async function callGateway(body: Record<string, unknown>, attempt = 0): Promise<any> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured");
   await acquireSlot();
