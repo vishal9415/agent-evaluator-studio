@@ -1,3 +1,4 @@
+import { CONVERSATIONAL_GUARDRAILS } from "./conversational-guardrails";
 export type Industry =
   | "Healthcare"
   | "Finance"
@@ -22,7 +23,13 @@ export type UseCase =
   | "Safety & Harm"
   | "Compliance"
   | "Prompt Injection Defense"
-  | "Source Grounding";
+  | "Source Grounding"
+  | "Voice Delivery"
+  | "Conversation Flow"
+  | "Escalation & Handoff"
+  | "Identity Verification"
+  | "Emotional Handling"
+  | "Persona Consistency";
 
 export type ModelFamily =
   | "GPT-4"
@@ -59,13 +66,15 @@ export const USE_CASES: UseCase[] = [
   "Topic Restriction", "Tone & Style", "Hallucination Reduction",
   "Bias Mitigation", "Safety & Harm", "Compliance",
   "Prompt Injection Defense", "Source Grounding",
+  "Voice Delivery", "Conversation Flow", "Escalation & Handoff",
+  "Identity Verification", "Emotional Handling", "Persona Consistency",
 ];
 
 export const MODELS: ModelFamily[] = [
   "Universal", "GPT-5", "GPT-4", "Claude", "Gemini", "Llama", "Mistral", "DeepSeek",
 ];
 
-export const GUARDRAILS: Guardrail[] = [
+const BASE_GUARDRAILS: Guardrail[] = [
   {
     id: "core-jailbreak-001",
     title: "Refuse Role-Play Override",
@@ -423,3 +432,5 @@ Never invent URLs, paper titles, court cases, statutes, API endpoints, library f
     prompt: `Detect the language of the user's latest message and respond in that same language and script. If the user mixes languages, mirror their dominant language. Never translate the user's own quoted text unless asked. If unsure, ask which language they prefer.`,
   },
 ];
+
+export const GUARDRAILS: Guardrail[] = [...CONVERSATIONAL_GUARDRAILS, ...BASE_GUARDRAILS];

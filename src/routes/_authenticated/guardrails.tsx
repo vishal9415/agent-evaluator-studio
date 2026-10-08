@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { GUARDRAILS } from "@/lib/guardrails-data";
 import { GuardrailCard } from "@/components/guardrails/GuardrailCard";
 import { FilterPanel, type Filters } from "@/components/guardrails/FilterPanel";
+import { GuardrailGenerator } from "@/components/guardrails/GuardrailGenerator";
 
 export const Route = createFileRoute("/_authenticated/guardrails")({
   head: () => ({
@@ -38,6 +39,7 @@ function GuardrailsPage() {
     <div className="mx-auto grid max-w-6xl gap-6 px-6 py-8 md:grid-cols-[240px_1fr]">
       <FilterPanel filters={filters} setFilters={setFilters} counts={{ total: GUARDRAILS.length, visible: visible.length }} />
       <div className="grid gap-4">
+        <GuardrailGenerator />
         {visible.map((g) => (
           <GuardrailCard key={g.id} g={g} />
         ))}
