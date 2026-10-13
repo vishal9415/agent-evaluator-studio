@@ -140,7 +140,10 @@ export function ManualChat({
   }, [bargeIn, muteWhileSpeaking]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = endRef.current;
+    const box = el?.parentElement;
+    if (box && box.scrollHeight > box.clientHeight) box.scrollTo({ top: box.scrollHeight, behavior: "smooth" });
+
   }, [messages]);
 
   useEffect(() => {
