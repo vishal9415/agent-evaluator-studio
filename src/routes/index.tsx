@@ -164,7 +164,7 @@ function Home() {
           </div>
           <div className="mx-auto mt-10 max-w-3xl rounded-2xl" style={{ boxShadow: "var(--shadow-elegant)" }}>
             <ClientOnly fallback={<div className="h-96 rounded-xl border border-border" />}>
-              <ManualChat systemPrompt={DEFAULT_PROMPT} model={MODELS[0].value} agentType="Chat" beginMessage={DEFAULT_BEGIN_MESSAGE} />
+              <ManualChat systemPrompt={DEFAULT_PROMPT} model={MODELS[0].value} agentType="Chat" beginMessage={DEFAULT_BEGIN_MESSAGE} variables={{ lead_name: "there" }} />
             </ClientOnly>
           </div>
         </section>
