@@ -143,7 +143,7 @@ export function ManualChat({
     const el = endRef.current;
     const box = el?.parentElement;
     if (box && box.scrollHeight > box.clientHeight) box.scrollTo({ top: box.scrollHeight, behavior: "smooth" });
-    else el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
   }, [messages]);
 
   useEffect(() => {
