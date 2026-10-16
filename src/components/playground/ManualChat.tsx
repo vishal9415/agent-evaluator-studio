@@ -27,6 +27,10 @@ interface Props {
   beginMessage?: string;
   stages?: Stage[];
   variables?: Record<string, string>;
+  /** Hide the live call history panel (e.g. on the public landing demo). */
+  showHistory?: boolean;
+  /** Clickable sample questions shown before the first message. */
+  suggestions?: string[];
 }
 
 
@@ -74,6 +78,8 @@ export function ManualChat({
   beginMessage = "",
   stages = [],
   variables = {},
+  showHistory = true,
+  suggestions = [],
 }: Props) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [stageId, setStageId] = useState<string | null>(stages[0]?.id ?? null);
