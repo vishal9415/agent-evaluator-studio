@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
-import { Play, Loader2, CheckCircle2, XCircle, AlertCircle, ChevronDown, ChevronRight } from "lucide-react";
+import { FileDown, ShieldCheck, Play, Loader2, CheckCircle2, XCircle, AlertCircle, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,8 @@ import { getEvaluation } from "@/lib/playground-data.functions";
 
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { SUITES, DEFAULT_SUITE, type SuiteId } from "@/lib/eval-suites";
+import { exportAuditReport } from "@/lib/audit-report";
 
 interface Props {
   systemPrompt: string;
@@ -53,6 +55,7 @@ export function AutoEval({ systemPrompt, model, agentType, promptId, onApplyImpr
   const [scenarios, setScenarios] = useState<ScenarioRow[]>([]);
   const [starting, setStarting] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [suite, setSuite] = useState<SuiteId>(DEFAULT_SUITE);
   const run = useServerFn(runEvaluation);
   const fetchEval = useServerFn(getEvaluation);
   const qc = useQueryClient();
@@ -92,7 +95,7 @@ export function AutoEval({ systemPrompt, model, agentType, promptId, onApplyImpr
     setExpanded(new Set());
     try {
       const res = await run({
-        data: { systemPrompt, model, agentType, promptId, scenarioCount: count },
+        data: { systemPrompt, model, agentType, promptId, scenarioCount: count, suite },
       });
       setActiveEvalId(res.evaluationId);
       qc.invalidateQueries({ queryKey: ["evaluations"] });
@@ -124,6 +127,7 @@ export function AutoEval({ systemPrompt, model, agentType, promptId, onApplyImpr
         suggestions?: string[];
         improved_prompt?: string;
         passRate?: number;
+        enterprise?: Enterprise;
       }
     | null
     | undefined;
@@ -167,6 +171,28 @@ export function AutoEval({ systemPrompt, model, agentType, promptId, onApplyImpr
             </Button>
           </div>
         </CardHeader>
+        <div className="border-t px-6 py-4">
+          <div className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            <ShieldCheck className="h-3.5 w-3.5" /> Test suite
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {SUITES.map((su) => (
+              <button
+                key={su.id}
+                type="button"
+                disabled={!!running}
+                onClick={() => setSuite(su.id)}
+                className={cn(
+                  "rounded-lg border p-2.5 text-left transition-colors disabled:opacity-60",
+                  suite === su.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "hover:bg-muted/50",
+                )}
+              >
+                <div className="text-xs font-semibold">{su.label}</div>
+                <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{su.description}</div>
+              </button>
+            ))}
+          </div>
+        </div>
         {evalRow && (
           <CardContent className="space-y-4 border-t bg-muted/20 pt-4">
             <div className="flex items-end justify-between">
@@ -269,6 +295,43 @@ export function AutoEval({ systemPrompt, model, agentType, promptId, onApplyImpr
             />
           </div>
 
+          {summary?.enterprise && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 gap-3">
+                <div>
+                  <CardTitle className="text-base">Enterprise readiness</CardTitle>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {summary.enterprise.suiteLabel} · prompt #{summary.enterprise.promptHash}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge
+                    variant={summary.enterprise.readiness === "Requires Remediation" ? "destructive" : "default"}
+                    className="rounded-full"
+                  >
+                    {summary.enterprise.readiness}
+                  </Badge>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      exportAuditReport({ evalRow: evalRow!, scenarios, summary: summary!, model, agentType, systemPrompt })
+                    }
+                  >
+                    <FileDown className="mr-1.5 h-3.5 w-3.5" /> Export audit report
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-3 md:grid-cols-5">
+                <Mini label="Safety & alignment" v={summary.enterprise.safety} />
+                <Mini label="PII protection" v={summary.enterprise.privacy} />
+                <Mini label="Adversarial resistance" v={summary.enterprise.adversarial} />
+                <Mini label="Critical failures" v={summary.enterprise.criticalFailures} raw bad={summary.enterprise.criticalFailures > 0} />
+                <Mini label="High failures" v={summary.enterprise.highFailures} raw bad={summary.enterprise.highFailures > 0} />
+              </CardContent>
+            </Card>
+          )}
+
           {summary && (
             <Card>
               <CardHeader>
@@ -343,6 +406,15 @@ export function AutoEval({ systemPrompt, model, agentType, promptId, onApplyImpr
                               </Badge>
                             )}
                             <StatusPill status={s.status} passed={s.passed} />
+                            {(() => {
+                              const e = summary?.enterprise?.scenarios.find((x) => x.idx === s.idx);
+                              if (!e || e.severity === "none") return null;
+                              return (
+                                <Badge variant="outline" className={cn("text-[10px] uppercase", SEV_CLASS[e.severity])}>
+                                  {e.severity}{e.vulnerability ? ` · ${e.vulnerability}` : ""}
+                                </Badge>
+                              );
+                            })()}
                           </div>
                           <p className="mt-1 text-sm">{s.user_goal}</p>
                           {(s.effectiveness !== null || s.hallucination !== null) && (
@@ -487,3 +559,36 @@ function StatusPill({ status, passed }: { status: string; passed: boolean | null
     </Badge>
   );
 }
+
+export type Enterprise = {
+  suite: string;
+  suiteLabel: string;
+  safety: number;
+  privacy: number;
+  adversarial: number;
+  criticalFailures: number;
+  highFailures: number;
+  readiness: string;
+  promptHash: string;
+  scenarios: Array<{ idx: number; severity: string; vulnerability: string; safety: number; privacy: number; adversarial: number }>;
+};
+
+const SEV_CLASS: Record<string, string> = {
+  low: "border-muted-foreground/30 text-muted-foreground",
+  moderate: "border-amber-500/50 text-amber-600",
+  high: "border-orange-500/60 text-orange-600",
+  critical: "border-destructive text-destructive",
+};
+
+function Mini({ label, v, raw, bad }: { label: string; v: number; raw?: boolean; bad?: boolean }) {
+  const n = Number(v) || 0;
+  const color = raw ? (bad ? "text-destructive" : "text-emerald-600") : n >= 85 ? "text-emerald-600" : n >= 70 ? "text-amber-600" : "text-destructive";
+  return (
+    <div className="rounded-lg border p-3">
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className={cn("mt-1 text-xl font-semibold tabular-nums", color)}>{raw ? n : n.toFixed(0)}</div>
+    </div>
+  );
+}
+
+
