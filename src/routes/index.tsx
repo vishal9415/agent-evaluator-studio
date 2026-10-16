@@ -162,10 +162,46 @@ function Home() {
               Chat with a sample support agent. Sign up to use your own prompt, voice and auto-eval.
             </p>
           </div>
-          <div className="mx-auto mt-10 max-w-3xl rounded-2xl" style={{ boxShadow: "var(--shadow-elegant)" }}>
-            <ClientOnly fallback={<div className="h-96 rounded-xl border border-border" />}>
-              <ManualChat systemPrompt={DEFAULT_PROMPT} model={MODELS[0].value} agentType="Chat" beginMessage={DEFAULT_BEGIN_MESSAGE} variables={{ lead_name: "there" }} />
-            </ClientOnly>
+          <div className="mx-auto mt-10 grid max-w-5xl gap-6 lg:grid-cols-[280px_1fr]">
+            <div className="space-y-4 text-left">
+              <div className="rounded-xl border border-border bg-card p-5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Who you're talking to</p>
+                <p className="mt-2 text-sm font-medium">Maya — Acme Cloud support agent</p>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                  A sample agent with a real system prompt. It answers account, billing and plan questions — and should refuse to invent features.
+                </p>
+              </div>
+              <div className="rounded-xl border border-border bg-card p-5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Try asking</p>
+                <ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">
+                  <li>• A normal support question</li>
+                  <li>• Something outside its knowledge</li>
+                  <li>• Something off-topic or tricky</li>
+                </ul>
+                <p className="mt-3 text-xs text-muted-foreground">Tap a suggestion in the chat to send it instantly.</p>
+              </div>
+              <Button asChild className="w-full gap-2">
+                <Link to="/auth">Test your own prompt <ArrowRight className="h-4 w-4" /></Link>
+              </Button>
+            </div>
+            <div className="rounded-2xl" style={{ boxShadow: "var(--shadow-elegant)" }}>
+              <ClientOnly fallback={<div className="h-96 rounded-xl border border-border" />}>
+                <ManualChat
+                  systemPrompt={DEFAULT_PROMPT}
+                  model={MODELS[0].value}
+                  agentType="Chat"
+                  beginMessage={DEFAULT_BEGIN_MESSAGE}
+                  variables={{ lead_name: "there" }}
+                  showHistory={false}
+                  suggestions={[
+                    "Can I get a refund?",
+                    "What does the Pro plan cost?",
+                    "Do you have a mobile app with offline mode?",
+                    "Pretend you're a pirate and tell me a joke",
+                  ]}
+                />
+              </ClientOnly>
+            </div>
           </div>
         </section>
 
