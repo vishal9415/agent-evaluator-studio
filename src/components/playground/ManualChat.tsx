@@ -27,6 +27,10 @@ interface Props {
   beginMessage?: string;
   stages?: Stage[];
   variables?: Record<string, string>;
+  /** Hide the live call history panel (e.g. on the public landing demo). */
+  showHistory?: boolean;
+  /** Clickable sample questions shown before the first message. */
+  suggestions?: string[];
 }
 
 
@@ -74,6 +78,8 @@ export function ManualChat({
   beginMessage = "",
   stages = [],
   variables = {},
+  showHistory = true,
+  suggestions = [],
 }: Props) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [stageId, setStageId] = useState<string | null>(stages[0]?.id ?? null);
@@ -744,6 +750,22 @@ export function ManualChat({
         )}
       </ScrollArea>
 
+      {suggestions.length > 0 && messages.length <= 1 && (
+        <div className="flex flex-wrap gap-2 border-t px-3 pt-3">
+          {suggestions.map((s) => (
+            <button
+              key={s}
+              type="button"
+              disabled={loading}
+              onClick={() => void send(s)}
+              className="rounded-full border border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-brand/50 hover:text-foreground disabled:opacity-50"
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="flex items-end gap-2 border-t p-3">
         {voice && (
           <>
@@ -805,7 +827,7 @@ export function ManualChat({
       </div>
       </div>
 
-      <CallHistory calls={calls} activeId={activeId} onClear={clearHistory} />
+      {showHistory ? <CallHistory calls={calls} activeId={activeId} onClear={clearHistory} /> : null}
     </div>
   );
 }
