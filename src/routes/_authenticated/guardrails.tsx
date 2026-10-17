@@ -12,6 +12,8 @@ export const Route = createFileRoute("/_authenticated/guardrails")({
       { name: "description", content: "Browse ready-to-paste guardrail prompts by industry, use case, model and severity." },
       { property: "og:title", content: "Guardrails Library — PromptLab" },
       { property: "og:description", content: "Ready-to-paste guardrail prompts for AI agents." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: GuardrailsPage,
