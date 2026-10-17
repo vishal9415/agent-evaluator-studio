@@ -103,6 +103,60 @@ export type Database = {
         }
         Relationships: []
       }
+      prompt_comparisons: {
+        Row: {
+          agent_type: string
+          completed_count: number
+          created_at: string
+          error: string | null
+          id: string
+          name: string
+          results: Json
+          scenario_count: number
+          scenarios: Json
+          status: string
+          suite: string
+          updated_at: string
+          user_id: string
+          variant_a: Json
+          variant_b: Json
+        }
+        Insert: {
+          agent_type: string
+          completed_count?: number
+          created_at?: string
+          error?: string | null
+          id?: string
+          name?: string
+          results?: Json
+          scenario_count: number
+          scenarios: Json
+          status?: string
+          suite: string
+          updated_at?: string
+          user_id?: string
+          variant_a: Json
+          variant_b: Json
+        }
+        Update: {
+          agent_type?: string
+          completed_count?: number
+          created_at?: string
+          error?: string | null
+          id?: string
+          name?: string
+          results?: Json
+          scenario_count?: number
+          scenarios?: Json
+          status?: string
+          suite?: string
+          updated_at?: string
+          user_id?: string
+          variant_a?: Json
+          variant_b?: Json
+        }
+        Relationships: []
+      }
       prompts: {
         Row: {
           agent_type: string

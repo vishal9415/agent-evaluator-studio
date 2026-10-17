@@ -141,7 +141,7 @@ export const chatCompletion = createServerFn({ method: "POST" })
   });
 
 /** Generate N scenarios for the given prompt + agent type. */
-async function generateScenarios(systemPrompt: string, agentType: string, count: number, suiteFocus = "") {
+export async function generateScenarios(systemPrompt: string, agentType: string, count: number, suiteFocus = "") {
   const tools = [
     {
       type: "function",
@@ -205,10 +205,11 @@ ${suiteFocus ? `\nSUITE FOCUS (overrides the default mix above):\n${suiteFocus}\
 }
 
 /** Run a short conversation for a scenario (up to 3 user turns), then judge it. */
-async function runAndJudgeScenario(
+export async function runAndJudgeScenario(
   systemPrompt: string,
   model: string,
   scenario: { category: string; user_goal: string; expected_behavior: string; opening_message: string },
+  fixedUserTurns?: string[],
 ) {
   const convo: Msg[] = [
     { role: "system", content: systemPrompt },
@@ -221,6 +222,13 @@ async function runAndJudgeScenario(
     const assistant = json?.choices?.[0]?.message?.content ?? "";
     convo.push({ role: "assistant", content: assistant });
     if (turn === 2) break;
+
+    if (fixedUserTurns) {
+      const next = fixedUserTurns[turn + 1];
+      if (!next) break;
+      convo.push({ role: "user", content: next });
+      continue;
+    }
 
     // Generate next user turn as a simulated user pursuing the goal
     const simJson = await callGateway({

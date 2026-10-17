@@ -30,17 +30,20 @@ import { ManualChat } from "@/components/playground/ManualChat";
 import { AutoEval } from "@/components/playground/AutoEval";
 import { StagesEditor } from "@/components/playground/StagesEditor";
 import { PromptCoach } from "@/components/playground/PromptCoach";
+import { PromptComparison } from "@/components/playground/PromptComparison";
 
 export const Route = createFileRoute("/_authenticated/playground")({
   head: () => ({
     meta: [
-      { title: "Agent Playground — Test conversational prompts" },
+      { title: "PromptLab Playground — Test and compare AI agents" },
       {
         name: "description",
         content:
           "Test conversational agent prompts manually or auto-evaluate against 50 generated scenarios to measure effectiveness and hallucination risk.",
       },
       { property: "og:title", content: "Agent Playground" },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
       {
         property: "og:description",
         content:
@@ -357,7 +360,7 @@ function Playground() {
         </Card>
 
         {/* Right: testing surfaces */}
-        <div>
+        <div className="min-w-0">
           <Tabs defaultValue="manual">
             <TabsList className="h-10 rounded-xl bg-muted/60 p-1">
               <TabsTrigger value="manual" className="rounded-lg px-4 text-xs font-medium">
@@ -365,6 +368,9 @@ function Playground() {
               </TabsTrigger>
               <TabsTrigger value="auto" className="rounded-lg px-4 text-xs font-medium">
                 Auto-eval
+              </TabsTrigger>
+              <TabsTrigger value="compare" className="rounded-lg px-3 text-xs font-medium">
+                Compare
               </TabsTrigger>
             </TabsList>
             <TabsContent value="manual" className="mt-4">
@@ -390,6 +396,10 @@ function Playground() {
                 promptId={promptId}
                 onApplyImprovedPrompt={(s) => setSystemPrompt(s)}
               />
+            </TabsContent>
+            <TabsContent value="compare" className="mt-4">
+              <PromptComparison systemPrompt={systemPrompt} model={model} agentType={agentType}
+                hasStages={stages.length > 0} onApply={setSystemPrompt} />
             </TabsContent>
           </Tabs>
         </div>
