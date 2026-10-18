@@ -1,10 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { pairedMetrics, comparisonDeltas, type Judgement } from "./prompt-comparison";
+import { pairedMetrics, comparisonDeltas, nextComparisonStamp, validateComparisonProgress, type Comparison, type Judgement } from "./prompt-comparison";
 const score = (effectiveness: number, hallucination: number, passed: boolean): Judgement => ({
   effectiveness, hallucination, passed, conversation: [], notes: "", safety: 95, privacy: 95,
   adversarial: 95, severity: "none", vulnerability: "",
 });
 describe("controlled prompt comparison", () => {
+  it("advances lock timestamps even when requests occur in the same millisecond", () => {
+    expect(nextComparisonStamp("2026-10-18T14:35:00.000Z", Date.parse("2026-10-18T14:35:00.000Z")))
+      .toBe("2026-10-18T14:35:00.001Z");
+  });
+  it("rejects progress that skips a scenario instead of appending a duplicate pair", () => {
+    expect(() => validateComparisonProgress({ completed_count: 1, scenario_count: 1, scenarios: [{}], results: [] } as unknown as Comparison))
+      .toThrow("Saved comparison progress is inconsistent");
+  });
   it("computes candidate minus baseline with lower hallucination reported as a negative delta", () => {
     expect(comparisonDeltas([{ idx: 0, a: score(70, 30, false), b: score(90, 10, true), error: null }]))
       .toEqual({ effectiveness: 20, hallucination: -20, passRate: 100 });

@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { variantSchema, scenarioSchema, type Comparison, type PairResult } from "./prompt-comparison";
+import { variantSchema, scenarioSchema, validateComparisonProgress, nextComparisonStamp, type Comparison, type PairResult } from "./prompt-comparison";
 import { getSuite } from "./eval-suites";
 import { generateScenarios, runAndJudgeScenario, callGateway } from "./playground.functions";
 import type { Json } from "@/integrations/supabase/types";
@@ -56,15 +56,24 @@ export const advanceComparison = createServerFn({ method: "POST" })
       .eq("id", data.id).eq("user_id", context.userId).single();
     if (error || !stored) throw new Error("Comparison not found.");
     const row = stored as unknown as Comparison;
+    const exhausted = validateComparisonProgress(row);
     if (row.status === "done") return row;
     if (row.status === "running" && Date.now() - Date.parse(row.updated_at) < 15 * 60 * 1000)
       throw new Error("This scenario pair is already running. Refresh results shortly.");
-    const stamp = new Date().toISOString();
+    const stamp = nextComparisonStamp(row.updated_at);
     const { data: locked, error: lockError } = await db.from("prompt_comparisons")
       .update({ status: "running", updated_at: stamp, error: null })
-      .eq("id", row.id).eq("user_id", context.userId).eq("updated_at", row.updated_at).select("id").maybeSingle();
+      .eq("id", row.id).eq("user_id", context.userId).eq("status", row.status)
+      .eq("updated_at", row.updated_at).select("id").maybeSingle();
     if (lockError || !locked) throw new Error("Another run is updating this comparison.");
     try {
+      if (exhausted) {
+        const { data: finished, error: finishError } = await db.from("prompt_comparisons")
+          .update({ status: "done", updated_at: nextComparisonStamp(stamp) })
+          .eq("id", row.id).eq("user_id", context.userId).eq("updated_at", stamp).select("*").single();
+        if (finishError) throw new Error("Could not finalize comparison.");
+        return finished as unknown as Comparison;
+      }
       const scenario = scenarioSchema.parse(row.scenarios[row.completed_count]);
       const pair: PairResult = { idx: row.completed_count, a: null, b: null, error: null };
       // Alternate order to reduce systematic ordering effects; never run both concurrently.
@@ -77,13 +86,14 @@ export const advanceComparison = createServerFn({ method: "POST" })
       const completed = row.completed_count + 1;
       const { data: updated, error: updateError } = await db.from("prompt_comparisons").update({
         results: asJson(results), completed_count: completed,
-        status: completed === row.scenario_count ? "done" : "ready", updated_at: new Date().toISOString(),
+        status: completed === row.scenario_count ? "done" : "ready", updated_at: nextComparisonStamp(stamp),
       }).eq("id", row.id).eq("user_id", context.userId).eq("updated_at", stamp).select("*").single();
       if (updateError) throw new Error("Could not save this scenario pair.");
       return updated as unknown as Comparison;
     } catch (e) {
-      await db.from("prompt_comparisons").update({ status: "error", error: "Run interrupted. Resume to retry the current pair.", updated_at: new Date().toISOString() })
+      const { error: releaseError } = await db.from("prompt_comparisons").update({ status: "error", error: "Run interrupted. Resume to retry the current pair.", updated_at: nextComparisonStamp(stamp) })
         .eq("id", row.id).eq("user_id", context.userId).eq("updated_at", stamp);
+      if (releaseError) throw new Error("Progress could not be saved or unlocked. Refresh results; retry after 15 minutes if still running.");
       throw e;
     }
   });

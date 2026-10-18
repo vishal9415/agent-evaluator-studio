@@ -79,13 +79,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "PromptLab" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { name: "description", content: "Evaluate and harden conversational AI agents with PromptLab." },
+      { name: "author", content: "PromptLab" },
+      { property: "og:title", content: "PromptLab" },
+      { property: "og:description", content: "Evaluation and guardrails for chat and voice agents." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {
