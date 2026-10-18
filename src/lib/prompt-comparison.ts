@@ -27,6 +27,24 @@ export type Comparison = {
   error: string | null; created_at: string; updated_at: string;
 };
 
+export function validateComparisonProgress(row: Comparison) {
+  if (!Number.isInteger(row.completed_count) || row.completed_count < 0 ||
+      row.scenario_count !== row.scenarios.length || row.completed_count > row.scenario_count ||
+      row.results.length !== row.completed_count || row.results.some((pair, i) => pair.idx !== i)) {
+    throw new Error("Saved comparison progress is inconsistent. Start a new comparison.");
+  }
+  variantSchema.parse(row.variant_a);
+  variantSchema.parse(row.variant_b);
+  row.scenarios.forEach((scenario) => scenarioSchema.parse(scenario));
+  return row.completed_count === row.scenario_count;
+}
+
+export function nextComparisonStamp(previous: string, now = Date.now()) {
+  const prior = Date.parse(previous);
+  if (!Number.isFinite(prior)) throw new Error("Invalid comparison timestamp.");
+  return new Date(Math.max(now, prior + 1)).toISOString();
+}
+
 export function pairedMetrics(results: PairResult[], side: "a" | "b") {
   const valid = results.filter((r) => r.a && r.b).flatMap((r) => r[side] ? [r[side]] : []);
   if (!valid.length) return null;

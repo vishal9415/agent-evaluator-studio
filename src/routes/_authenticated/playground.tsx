@@ -31,6 +31,7 @@ import { AutoEval } from "@/components/playground/AutoEval";
 import { StagesEditor } from "@/components/playground/StagesEditor";
 import { PromptCoach } from "@/components/playground/PromptCoach";
 import { PromptComparison } from "@/components/playground/PromptComparison";
+import { VoiceExport } from "@/components/playground/VoiceExport";
 
 export const Route = createFileRoute("/_authenticated/playground")({
   head: () => ({
@@ -362,7 +363,7 @@ function Playground() {
         {/* Right: testing surfaces */}
         <div className="min-w-0">
           <Tabs defaultValue="manual">
-            <TabsList className="h-10 rounded-xl bg-muted/60 p-1">
+            <TabsList className="h-auto min-h-10 max-w-full flex-wrap rounded-xl bg-muted/60 p-1">
               <TabsTrigger value="manual" className="rounded-lg px-4 text-xs font-medium">
                 Manual testing
               </TabsTrigger>
@@ -371,6 +372,9 @@ function Playground() {
               </TabsTrigger>
               <TabsTrigger value="compare" className="rounded-lg px-3 text-xs font-medium">
                 Compare
+              </TabsTrigger>
+              <TabsTrigger value="export" className="rounded-lg px-3 text-xs font-medium">
+                Export
               </TabsTrigger>
             </TabsList>
             <TabsContent value="manual" className="mt-4">
@@ -400,6 +404,9 @@ function Playground() {
             <TabsContent value="compare" className="mt-4">
               <PromptComparison systemPrompt={systemPrompt} model={model} agentType={agentType}
                 hasStages={stages.length > 0} onApply={setSystemPrompt} />
+            </TabsContent>
+            <TabsContent value="export" className="mt-4">
+              <VoiceExport input={{ name, systemPrompt, beginMessage, model, agentType, stages, variables }} />
             </TabsContent>
           </Tabs>
         </div>

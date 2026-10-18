@@ -32,7 +32,10 @@ export function PromptComparison({ systemPrompt, model, agentType, hasStages, on
   const list = useServerFn(listComparisons);
 
   async function refresh() {
-    try { const rows = await list(); if (alive.current) setHistory(rows); }
+    try { const rows = await list(); if (alive.current) {
+      setHistory(rows);
+      setActive((current) => current ? rows.find((row) => row.id === current.id) ?? current : null);
+    } }
     catch { toast.error("Could not load saved comparisons."); }
   }
   useEffect(() => {
@@ -45,6 +48,7 @@ export function PromptComparison({ systemPrompt, model, agentType, hasStages, on
     stopped.current = false;
     setPausing(false);
     setBusy(true);
+    if (!existing) setActive(null);
     try {
       let row = existing ?? await create({ data: { a, b, suite, count, agentType: agentType === "voice" ? "voice" : "chat" } });
       if (alive.current) setActive(row);

@@ -1,10 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { pairedMetrics, comparisonDeltas, type Judgement } from "./prompt-comparison";
+import { pairedMetrics, comparisonDeltas, nextComparisonStamp, validateComparisonProgress, type Comparison, type Judgement } from "./prompt-comparison";
 const score = (effectiveness: number, hallucination: number, passed: boolean): Judgement => ({
   effectiveness, hallucination, passed, conversation: [], notes: "", safety: 95, privacy: 95,
   adversarial: 95, severity: "none", vulnerability: "",
 });
 describe("controlled prompt comparison", () => {
+  it("advances lock timestamps even when requests occur in the same millisecond", () => {
+    expect(nextComparisonStamp("2026-10-18T14:35:00.000Z", Date.parse("2026-10-18T14:35:00.000Z")))
+      .toBe("2026-10-18T14:35:00.001Z");
+  });
+  it("rejects progress that skips a scenario instead of appending a duplicate pair", () => {
+    expect(() => validateComparisonProgress({ completed_count: 1, scenario_count: 1, scenarios: [{}], results: [] } as unknown as Comparison))
+      .toThrow("Saved comparison progress is inconsistent");
+  });
+  it("recognizes an exhausted run so it can finalize without executing an extra scenario", () => {
+    const variant = { label: "Test", systemPrompt: "Support agent", model: "google/gemini-2.5-flash" };
+    const scenario = { category: "support", user_goal: "Get help", expected_behavior: "Respond", opening_message: "Hello", userTurns: ["Hello"] };
+    expect(validateComparisonProgress({ variant_a: variant, variant_b: variant, completed_count: 1,
+      scenario_count: 1, scenarios: [scenario], results: [{ idx: 0, a: score(90, 0, true), b: score(90, 0, true), error: null }] } as Comparison)).toBe(true);
+  });
   it("computes candidate minus baseline with lower hallucination reported as a negative delta", () => {
     expect(comparisonDeltas([{ idx: 0, a: score(70, 30, false), b: score(90, 10, true), error: null }]))
       .toEqual({ effectiveness: 20, hallucination: -20, passRate: 100 });

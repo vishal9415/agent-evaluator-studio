@@ -1,4 +1,5 @@
 # Architecture
 - Paired comparisons use authenticated server functions and owner-scoped RLS in a separate comparisons table; existing standalone evaluations remain independent.
-- Comparison runs advance one scenario pair per request and persist snapshots and progress so completed results survive navigation.
+- Comparison runs advance one scenario pair per request with validated persisted progress and strictly increasing compare-and-set lease timestamps, so results survive navigation and duplicate requests cannot share a lease.
 - Both comparison variants receive identical scripted user turns and expected behavior, with a common evaluator, to keep comparisons controlled.
+- Voice exports are browser-generated handoff bundles preserving the complete stage graph; native drafts are included only for documented configuration surfaces, while unsupported runtimes stay explicitly developer handoffs to avoid false deployment claims.
