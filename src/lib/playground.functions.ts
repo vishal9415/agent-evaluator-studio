@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { DEFAULT_PROMPT } from "@/lib/playground-constants";
+import { isLocalOllamaModel, taskModel } from "@/lib/ollama-models";
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
@@ -60,16 +61,6 @@ export async function callGateway(body: Record<string, unknown>, attempt = 0): P
     throw new Error(`AI gateway error ${res.status}: ${txt.slice(0, 300)}`);
   }
   return res.json();
-}
-
-/** Whether a model ID refers to local Ollama inference. */
-export function isLocalOllamaModel(model: string): boolean {
-  return model.startsWith("ollama/");
-}
-
-/** Use local inference for supporting evaluation steps when a local model is selected. */
-export function taskModel(selected: string, fallback: string): string {
-  return isLocalOllamaModel(selected) ? selected : fallback;
 }
 
 /** Chat-completions adapter for local Ollama models; no external API key is required. */
