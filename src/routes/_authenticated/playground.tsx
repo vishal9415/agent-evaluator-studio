@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { listPrompts, savePrompt as savePromptFn } from "@/lib/playground-data.functions";
@@ -208,7 +207,6 @@ function Playground() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-muted/40 via-background to-background">
-      <Toaster richColors position="top-right" />
       <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
         <section className="mb-6 flex flex-col gap-4 border-b border-border/70 pb-6 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
