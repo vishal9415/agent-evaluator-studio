@@ -6,7 +6,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Toaster } from "@/components/ui/sonner";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -93,7 +92,6 @@ function AuthPage() {
 
   return (
     <div className="min-h-screen bg-background lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.82fr)]">
-      <Toaster />
       <aside className="relative hidden min-h-screen overflow-hidden bg-[#0b1311] p-10 text-white lg:flex lg:flex-col lg:justify-between xl:p-14">
         <div className="pointer-events-none absolute -right-24 top-16 h-96 w-96 rounded-full bg-emerald-300/10 blur-[100px]" aria-hidden="true" />
         <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-teal-400/10 blur-[90px]" aria-hidden="true" />
