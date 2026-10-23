@@ -322,21 +322,21 @@ export function LiveRealtimeTest() {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
+      <Card className="overflow-hidden rounded-[22px] border-[#e0e9e3] bg-white shadow-[0_12px_40px_-30px_rgba(16,43,37,0.35)]">
+        <CardHeader className="border-b border-[#e5eee8] bg-[#f8faf9] px-5 py-5 sm:px-7">
           <CardTitle className="flex items-center gap-2"><Radio className="h-5 w-5" /> Live voice test</CardTitle>
           <CardDescription>
             Connect the browser microphone to an OpenAI Realtime session. Session metadata and event timings are saved; raw audio and transcript text are not persisted.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+        <CardContent className="space-y-5 px-5 py-5 sm:px-7 sm:py-6">
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-950">
             <p className="flex items-center gap-2 font-medium"><ShieldCheck className="h-4 w-4" /> Before you start</p>
             <p className="mt-1 text-muted-foreground">Your microphone will be active while the session is running. Speak only with consent from anyone whose voice may be captured. End the session to stop microphone capture.</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="space-y-1.5 text-sm font-medium">Realtime model
-              <select className="h-10 w-full rounded-md border border-input bg-background px-3 font-normal" value={model} onChange={(event) => setModel(event.target.value as typeof model)} disabled={active}>
+              <select className="h-11 w-full rounded-xl border-[#dce8e1] bg-white px-3 font-normal focus-visible:ring-[#83bda0]" value={model} onChange={(event) => setModel(event.target.value as typeof model)} disabled={active}>
                 {MODELS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
               </select>
             </label>
@@ -347,7 +347,7 @@ export function LiveRealtimeTest() {
             </label>
           </div>
           <label className="block space-y-1.5 text-sm font-medium">Agent instructions
-            <Textarea className="min-h-40 font-mono text-xs" value={instructions} onChange={(event) => setInstructions(event.target.value)} maxLength={5000} disabled={active} />
+            <Textarea className="min-h-40 rounded-xl border-[#dce8e1] bg-[#f9fbfa] font-mono text-xs" value={instructions} onChange={(event) => setInstructions(event.target.value)} maxLength={5000} disabled={active} />
             <span className="block text-xs font-normal text-muted-foreground">{instructions.length}/5000 characters. Instructions are sent for this session; this page does not create a versioned prompt.</span>
           </label>
           <p className="text-xs text-muted-foreground">A 10-minute browser timer stops local capture and asks the server to hang up the provider call. A remote hangup result is reported when available; this is not yet a persistent watchdog for a malicious or abandoned browser.</p>
@@ -364,7 +364,7 @@ export function LiveRealtimeTest() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="overflow-hidden rounded-[22px] border-[#e0e9e3] bg-white shadow-[0_12px_40px_-30px_rgba(16,43,37,0.35)]">
         <CardHeader>
           <CardTitle>Conversation transcript</CardTitle>
           <CardDescription>Provider transcription events only. Missing events are not inferred.</CardDescription>
@@ -384,7 +384,7 @@ export function LiveRealtimeTest() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="overflow-hidden rounded-[22px] border-[#e0e9e3] bg-white shadow-[0_12px_40px_-30px_rgba(16,43,37,0.35)]">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div><CardTitle>Event timeline</CardTitle><CardDescription>Local browser receive time; newest events appear last.</CardDescription></div>
           <Button size="sm" variant="ghost" onClick={() => { setEvents([]); setTranscript([]); setObservedGapMs(null); }} disabled={active || events.length === 0}><Trash2 className="mr-2 h-4 w-4" /> Clear</Button>
