@@ -3,6 +3,7 @@ import { createFileRoute, Link, Outlet, redirect, useNavigate } from "@tanstack/
 import { ArrowRight, AudioLines, FlaskConical, LayoutDashboard, LogOut, Menu, Mic2, ShieldCheck, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -33,8 +34,10 @@ function Layout() {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+      toast.success("Signed out successfully");
       await navigate({ to: "/" });
-    } catch {
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "Could not sign out. Please retry.");
       setSigningOut(false);
     }
   }
@@ -53,7 +56,7 @@ function Layout() {
           </nav>
 
           <div className="flex items-center gap-2">
-            <div className="hidden items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground lg:flex"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />Workspace ready</div>
+            <div className="hidden items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground lg:flex"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />Private workspace</div>
             <Button size="sm" variant="ghost" onClick={() => void signOut()} disabled={signingOut} className="hidden sm:inline-flex">{signingOut ? "Signing out…" : <><LogOut className="mr-2 h-4 w-4" />Sign out</>}</Button>
             <button type="button" onClick={() => setMobileOpen((value) => !value)} aria-label={mobileOpen ? "Close workspace navigation" : "Open workspace navigation"} aria-expanded={mobileOpen} aria-controls="workspace-mobile-nav" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-background text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:hidden">{mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}</button>
           </div>
