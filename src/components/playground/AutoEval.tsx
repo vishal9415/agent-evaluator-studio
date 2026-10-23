@@ -144,7 +144,7 @@ export function AutoEval({ systemPrompt, model, agentType, promptId, onApplyImpr
 
   return (
     <div className="space-y-4">
-      <Card className="overflow-hidden border-border/70 shadow-sm">
+      <Card className="overflow-hidden rounded-[22px] border-[#e0e9e3] bg-white shadow-[0_12px_40px_-30px_rgba(16,43,37,0.35)]">
         <CardHeader className="flex flex-col gap-4 pb-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <CardTitle className="flex items-center gap-2 text-sm font-semibold"><ShieldCheck className="h-4 w-4 text-brand" /> Automatic evaluation</CardTitle>
