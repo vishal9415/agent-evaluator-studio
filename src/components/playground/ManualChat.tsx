@@ -10,7 +10,7 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { chatCompletion, synthesizeSpeech } from "@/lib/playground.functions";
+import { chatCompletion, publicDemoChatCompletion, synthesizeSpeech } from "@/lib/playground.functions";
 import { fillVariables, transitionToolName, type Stage } from "@/lib/playground-constants";
 import { CallHistory } from "@/components/playground/CallHistory";
 import { useCallHistory } from "@/lib/call-history";
@@ -31,6 +31,8 @@ interface Props {
   showHistory?: boolean;
   /** Clickable sample questions shown before the first message. */
   suggestions?: string[];
+  /** Use the fixed, rate-limited anonymous demo endpoint instead of authenticated playground calls. */
+  publicDemo?: boolean;
 }
 
 
@@ -80,6 +82,7 @@ export function ManualChat({
   variables = {},
   showHistory = true,
   suggestions = [],
+  publicDemo = false,
 }: Props) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [stageId, setStageId] = useState<string | null>(stages[0]?.id ?? null);
@@ -116,6 +119,7 @@ export function ManualChat({
   const [ttsFallback, setTtsFallback] = useState(false);
 
   const chat = useServerFn(chatCompletion);
+  const publicDemoChat = useServerFn(publicDemoChatCompletion);
   const tts = useServerFn(synthesizeSpeech);
   const endRef = useRef<HTMLDivElement>(null);
   const recRef = useRef<any>(null);
@@ -382,9 +386,11 @@ export function ManualChat({
     try {
       const filledSystem = fillVariables(systemPrompt, variables);
       let activeStage = stageId;
-      let res = await chat({
-        data: { model, systemPrompt: filledSystem, messages: next, ...stagePayload(activeStage) },
-      });
+      let res = publicDemo
+        ? await publicDemoChat({ data: { messages: next } })
+        : await chat({
+            data: { model, systemPrompt: filledSystem, messages: next, ...stagePayload(activeStage) },
+          });
       const history: Msg[] = [...next];
 
       if (res.moveTo) {
@@ -588,6 +594,7 @@ export function ManualChat({
           )}
         </div>
         <div className="flex items-center gap-2">
+{!publicDemo && (
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="ghost" size="sm" title="Voice & VAD settings">
@@ -706,6 +713,8 @@ export function ManualChat({
               </div>
             </PopoverContent>
           </Popover>
+          )}
+{!publicDemo && (
           <Button
             variant="ghost"
             size="sm"
@@ -714,6 +723,7 @@ export function ManualChat({
           >
             {speakOutput ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
           </Button>
+          )}
           <Button variant="ghost" size="sm" onClick={() => setMessages([])}>
             Clear
           </Button>

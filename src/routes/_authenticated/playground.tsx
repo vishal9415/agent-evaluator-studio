@@ -32,6 +32,7 @@ import { StagesEditor } from "@/components/playground/StagesEditor";
 import { PromptCoach } from "@/components/playground/PromptCoach";
 import { PromptComparison } from "@/components/playground/PromptComparison";
 import { VoiceExport } from "@/components/playground/VoiceExport";
+import { PromptVersionHistory, type PromptSnapshot } from "@/components/playground/PromptVersionHistory";
 
 export const Route = createFileRoute("/_authenticated/playground")({
   head: () => ({
@@ -95,6 +96,7 @@ function Playground() {
   const [saved, setSaved] = useState<SavedPrompt[]>([]);
   const [saving, setSaving] = useState(false);
   const [coachOpen, setCoachOpen] = useState(false);
+  const [versionRefreshKey, setVersionRefreshKey] = useState(0);
 
   const variables = textToVars(varsText);
   const fetchPrompts = useServerFn(listPrompts);
@@ -132,7 +134,8 @@ function Playground() {
         },
       });
       if (res.id) setPromptId(res.id);
-      toast.success("Saved");
+      setVersionRefreshKey((value) => value + 1);
+      toast.success(res.versionNumber ? `Saved as version ${res.versionNumber}` : "Saved");
       void refreshSaved();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Save failed");
@@ -141,6 +144,16 @@ function Playground() {
     }
   }
 
+
+  function restoreSnapshot(snapshot: PromptSnapshot) {
+    setName(snapshot.name);
+    setSystemPrompt(snapshot.system_prompt);
+    setModel(snapshot.model);
+    setAgentType(snapshot.agent_type);
+    setBeginMessage(snapshot.begin_message ?? "");
+    setStages(Array.isArray(snapshot.stages) ? snapshot.stages : []);
+    setVarsText(varsToText(snapshot.variables ?? {}));
+  }
 
   function loadPrompt(id: string) {
     if (id === "__new__") {
@@ -355,8 +368,13 @@ function Playground() {
 
             <Button onClick={savePrompt} disabled={saving} className="h-10 w-full rounded-lg">
               <Save className="mr-2 h-4 w-4" />
-              {promptId ? "Update prompt" : "Save prompt"}
+              {promptId ? "Save new version" : "Save prompt"}
             </Button>
+            <PromptVersionHistory
+              promptId={promptId}
+              refreshToken={versionRefreshKey}
+              onRestore={restoreSnapshot}
+            />
           </CardContent>
         </Card>
 

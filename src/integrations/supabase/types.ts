@@ -25,11 +25,13 @@ export type Database = {
           id: string
           model: string
           prompt_id: string | null
+          prompt_version_id: string | null
           prompt_snapshot: string
           scenario_count: number
           status: string
           summary: Json | null
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           agent_type: string
@@ -41,11 +43,13 @@ export type Database = {
           id?: string
           model: string
           prompt_id?: string | null
+          prompt_version_id?: string | null
           prompt_snapshot: string
           scenario_count?: number
           status?: string
           summary?: Json | null
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           agent_type?: string
@@ -62,6 +66,7 @@ export type Database = {
           status?: string
           summary?: Json | null
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -69,6 +74,13 @@ export type Database = {
             columns: ["prompt_id"]
             isOneToOne: false
             referencedRelation: "prompts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evaluations_prompt_version_id_fkey"
+            columns: ["prompt_version_id"]
+            isOneToOne: false
+            referencedRelation: "prompt_versions"
             referencedColumns: ["id"]
           },
         ]
@@ -156,6 +168,44 @@ export type Database = {
           variant_b?: Json
         }
         Relationships: []
+      }
+      prompt_versions: {
+        Row: {
+          change_note: string | null
+          created_at: string
+          id: string
+          prompt_id: string
+          snapshot: Json
+          user_id: string
+          version_number: number
+        }
+        Insert: {
+          change_note?: string | null
+          created_at?: string
+          id?: string
+          prompt_id: string
+          snapshot: Json
+          user_id: string
+          version_number: number
+        }
+        Update: {
+          change_note?: string | null
+          created_at?: string
+          id?: string
+          prompt_id?: string
+          snapshot?: Json
+          user_id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prompt_versions_prompt_id_fkey"
+            columns: ["prompt_id"]
+            isOneToOne: false
+            referencedRelation: "prompts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       prompts: {
         Row: {
@@ -255,12 +305,265 @@ export type Database = {
           },
         ]
       }
+      voice_credit_accounts: {
+        Row: {
+          user_id: string
+          created_at: string
+        }
+        Insert: {
+          user_id: string
+          created_at?: string
+        }
+        Update: {
+          user_id?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      voice_usage_ledger: {
+        Row: {
+          id: string
+          user_id: string
+          entry_type: string
+          amount_seconds: number
+          session_id: string | null
+          idempotency_key: string
+          actor_user_id: string | null
+          reason: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          entry_type: string
+          amount_seconds: number
+          session_id?: string | null
+          idempotency_key: string
+          actor_user_id?: string | null
+          reason: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          entry_type?: string
+          amount_seconds?: number
+          session_id?: string | null
+          idempotency_key?: string
+          actor_user_id?: string | null
+          reason?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_usage_ledger_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "voice_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      voice_usage_reservations: {
+        Row: {
+          id: string
+          user_id: string
+          session_id: string
+          reserved_seconds: number
+          consumed_seconds: number | null
+          status: string
+          idempotency_key: string
+          created_at: string
+          finalized_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          session_id: string
+          reserved_seconds: number
+          consumed_seconds?: number | null
+          status?: string
+          idempotency_key: string
+          created_at?: string
+          finalized_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          session_id?: string
+          reserved_seconds?: number
+          consumed_seconds?: number | null
+          status?: string
+          idempotency_key?: string
+          created_at?: string
+          finalized_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_usage_reservations_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "voice_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      voice_session_events: {
+        Row: {
+          id: string
+          session_id: string
+          user_id: string
+          event_key: string
+          event_type: string
+          source: string
+          client_elapsed_ms: number | null
+          measurement_status: string
+          received_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          session_id: string
+          user_id: string
+          event_key: string
+          event_type: string
+          source: string
+          client_elapsed_ms?: number | null
+          measurement_status?: string
+          received_at?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          session_id?: string
+          user_id?: string
+          event_key?: string
+          event_type?: string
+          source?: string
+          client_elapsed_ms?: number | null
+          measurement_status?: string
+          received_at?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_session_events_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "voice_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      voice_sessions: {
+        Row: {
+          id: string
+          user_id: string
+          provider: string
+          provider_call_id: string | null
+          status: string
+          model: string
+          voice: string
+          prompt_fingerprint: string
+          started_at: string
+          connected_at: string | null
+          ended_at: string | null
+          duration_seconds: number | null
+          end_reason: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          provider?: string
+          provider_call_id?: string | null
+          status?: string
+          model: string
+          voice: string
+          prompt_fingerprint: string
+          started_at?: string
+          connected_at?: string | null
+          ended_at?: string | null
+          duration_seconds?: number | null
+          end_reason?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          provider?: string
+          provider_call_id?: string | null
+          status?: string
+          model?: string
+          voice?: string
+          prompt_fingerprint?: string
+          started_at?: string
+          connected_at?: string | null
+          ended_at?: string | null
+          duration_seconds?: number | null
+          end_reason?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_voice_usage_summary: {
+        Args: { p_user_id: string }
+        Returns: {
+          balance_seconds: number
+          reserved_seconds: number
+          granted_seconds: number
+          used_seconds: number
+        }[]
+      }
+      grant_voice_test_seconds: {
+        Args: {
+          p_user_id: string
+          p_actor_user_id: string
+          p_amount_seconds: number
+          p_reason: string
+          p_idempotency_key: string
+        }
+        Returns: { ledger_id: string; available_seconds: number }[]
+      }
+      reconcile_voice_test_seconds: {
+        Args: {
+          p_user_id: string
+          p_session_id: string
+          p_consumed_seconds: number
+          p_idempotency_key: string
+        }
+        Returns: { reservation_id: string; consumed_seconds: number; available_seconds: number }[]
+      }
+      reserve_voice_test_seconds: {
+        Args: {
+          p_user_id: string
+          p_session_id: string
+          p_reserved_seconds: number
+          p_idempotency_key: string
+        }
+        Returns: { reservation_id: string; available_seconds: number }[]
+      }
+      save_prompt_version: {
+        Args: {
+          p_change_note?: string | null
+          p_payload: Json
+          p_prompt_id: string | null
+          p_user_id: string
+        }
+        Returns: {
+          prompt_id: string
+          version_id: string
+          version_number: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

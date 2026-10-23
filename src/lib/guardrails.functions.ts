@@ -38,6 +38,7 @@ BANNED: "be helpful", "be respectful", "ensure accuracy", "as appropriate", "use
 Return 12–20 guardrails ordered by severity (critical first).`;
 
 export const generateGuardrails = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d) => inputSchema.parse(d))
   .handler(async ({ data }) => {
     const exemplars = GUARDRAILS.filter((g) => EXEMPLAR_IDS.includes(g.id))

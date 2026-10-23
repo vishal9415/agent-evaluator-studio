@@ -22,6 +22,7 @@ function Layout() {
         <nav className="flex items-center gap-4 text-sm">
           <Link to="/" className="font-semibold text-foreground">PromptLab</Link>
           <Link to="/playground" className="text-muted-foreground" activeProps={{ className: 'text-foreground' }}>Playground</Link>
+          <Link to="/voice-reliability" className="text-muted-foreground" activeProps={{ className: 'text-foreground' }}>Voice Reliability</Link>
           <Link to="/guardrails" className="text-muted-foreground" activeProps={{ className: 'text-foreground' }}>Guardrails</Link>
         </nav>
         <Button

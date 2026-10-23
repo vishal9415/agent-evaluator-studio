@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Json } from "@/integrations/supabase/types";
 
 const stageSchema = z.object({
   id: z.string(),
@@ -25,48 +27,83 @@ async function admin() {
   return supabaseAdmin;
 }
 
-export const listPrompts = createServerFn({ method: "GET" }).handler(async () => {
-  const db = await admin();
-  const { data, error } = await db
-    .from("prompts")
-    .select("id, name, system_prompt, model, agent_type, begin_message, stages, variables")
-    .order("updated_at", { ascending: false })
-    .limit(20);
-  if (error) throw new Error(error.message);
-  return data ?? [];
-});
+export const listPrompts = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const db = await admin();
+    const { data, error } = await db
+      .from("prompts")
+      .select("id, name, system_prompt, model, agent_type, begin_message, stages, variables")
+      .eq("user_id", context.userId)
+      .order("updated_at", { ascending: false })
+      .limit(20);
+    if (error) throw new Error("Could not load saved prompts.");
+    return data ?? [];
+  });
 
 export const savePrompt = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((data) =>
-    z.object({ id: z.string().uuid().nullable(), payload: promptPayload }).parse(data),
+    z.object({
+      id: z.string().uuid().nullable(),
+      payload: promptPayload,
+    }).parse(data),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const db = await admin();
-    if (data.id) {
-      const { error } = await db
-        .from("prompts")
-        .update({ ...data.payload, updated_at: new Date().toISOString() } as never)
-        .eq("id", data.id);
-      if (error) throw new Error(error.message);
-      return { id: data.id };
+    const { data: versions, error } = await db.rpc("save_prompt_version", {
+      p_user_id: context.userId,
+      p_prompt_id: data.id,
+      p_payload: data.payload as unknown as Json,
+      p_change_note: "Saved from Prompt Playground",
+    });
+    if (error || !versions?.length) {
+      throw new Error("Could not save a new prompt version.");
     }
-    const { data: row, error } = await db
-      .from("prompts")
-      .insert(data.payload as never)
-      .select("id")
-      .single();
-    if (error) throw new Error(error.message);
-    return { id: row.id };
+    const latest = versions[0];
+    return {
+      id: latest.prompt_id,
+      versionId: latest.version_id,
+      versionNumber: latest.version_number,
+    };
   });
 
 export const getEvaluation = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((data) => z.object({ evaluationId: z.string().uuid() }).parse(data))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const db = await admin();
-    const [ev, sc] = await Promise.all([
-      db.from("evaluations").select("*").eq("id", data.evaluationId).single(),
-      db.from("scenarios").select("*").eq("evaluation_id", data.evaluationId).order("idx"),
-    ]);
-    if (ev.error) throw new Error(ev.error.message);
-    return { evaluation: ev.data, scenarios: sc.data ?? [] };
+    const { data: evaluation, error: evaluationError } = await db
+      .from("evaluations")
+      .select("*")
+      .eq("id", data.evaluationId)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (evaluationError || !evaluation) throw new Error("Evaluation not found in your account.");
+
+    const { data: scenarios, error: scenariosError } = await db
+      .from("scenarios")
+      .select("*")
+      .eq("evaluation_id", data.evaluationId)
+      .order("idx");
+    if (scenariosError) throw new Error("Could not load evaluation scenarios.");
+    return { evaluation, scenarios: scenarios ?? [] };
+  });
+
+
+/** List immutable configuration snapshots belonging to the signed-in user. */
+export const listPromptVersions = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data) => z.object({ promptId: z.string().uuid() }).parse(data))
+  .handler(async ({ data, context }) => {
+    const db = await admin();
+    const { data: versions, error } = await db
+      .from("prompt_versions")
+      .select("id, prompt_id, version_number, snapshot, change_note, created_at")
+      .eq("prompt_id", data.promptId)
+      .eq("user_id", context.userId)
+      .order("version_number", { ascending: false })
+      .limit(50);
+    if (error) throw new Error("Could not load prompt version history.");
+    return versions ?? [];
   });
