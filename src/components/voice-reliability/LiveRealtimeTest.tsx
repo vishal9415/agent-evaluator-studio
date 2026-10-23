@@ -244,8 +244,10 @@ export function LiveRealtimeTest() {
           speechStoppedAtRef.current = null;
         }
 
-        if (type === "conversation.item.input_audio_transcription.completed" && typeof payload.transcript === "string") {
-          setTranscript((previous) => [...previous, { id: ++sequenceRef.current, role: "Caller", text: payload.transcript.slice(0, 4000) }]);
+        const callerTranscript = payload.transcript;
+        if (type === "conversation.item.input_audio_transcription.completed" && typeof callerTranscript === "string") {
+          const text = callerTranscript.slice(0, 4000);
+          setTranscript((previous) => [...previous, { id: ++sequenceRef.current, role: "Caller", text }]);
         } else if (
           (type === "response.output_audio_transcript.done" && typeof payload.transcript === "string") ||
           (type === "response.output_text.done" && typeof payload.text === "string")
