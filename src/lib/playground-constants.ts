@@ -7,6 +7,8 @@ export const MODELS = [
   { value: "openai/gpt-5-mini", label: "GPT-5 mini" },
   { value: "openai/gpt-5-nano", label: "GPT-5 nano" },
   { value: "openai/gpt-5.2", label: "GPT-5.2 (reasoning)" },
+  { value: "ollama/qwen3:4b", label: "Local · Qwen3 4B (Ollama, free)" },
+  { value: "ollama/llama3.2:3b", label: "Local · Llama 3.2 3B (Ollama, free)" },
 ];
 
 export const AGENT_TYPES = [
