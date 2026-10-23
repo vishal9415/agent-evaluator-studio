@@ -171,7 +171,35 @@ function Playground() {
     setVarsText(varsToText(snapshot.variables ?? {}));
   }
 
+  function confirmDiscardDraft() {
+    const isPristineNewDraft =
+      !promptId &&
+      name === "Untitled prompt" &&
+      beginMessage === DEFAULT_BEGIN_MESSAGE &&
+      systemPrompt === DEFAULT_PROMPT &&
+      stages.length === 0 &&
+      model === MODELS[0].value &&
+      agentType === "chat" &&
+      varsText === "lead_name=Priya";
+    if (!hasUnsavedChanges || isPristineNewDraft) return true;
+    return window.confirm("You have unsaved prompt changes. Discard them and continue?");
+  }
+
+  function resetToSample() {
+    if (!confirmDiscardDraft()) return;
+    setName("Untitled prompt");
+    setBeginMessage(DEFAULT_BEGIN_MESSAGE);
+    setSystemPrompt(DEFAULT_PROMPT);
+    setStages([]);
+    setModel(MODELS[0].value);
+    setAgentType("chat");
+    setVarsText("lead_name=Priya");
+    setPromptId(null);
+    setSavedSignature(null);
+  }
+
   function loadPrompt(id: string) {
+    if (id !== (promptId ?? "__new__") && !confirmDiscardDraft()) return;
     if (id === "__new__") {
       setPromptId(null);
       setName("Untitled prompt");
@@ -235,7 +263,7 @@ function Playground() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2 lg:justify-end">
-              <Button variant="outline" size="sm" onClick={() => { setName("Untitled prompt"); setBeginMessage(DEFAULT_BEGIN_MESSAGE); setSystemPrompt(DEFAULT_PROMPT); setStages([]); setModel(MODELS[0].value); setAgentType("chat"); setVarsText("lead_name=Priya"); setPromptId(null); setSavedSignature(null); }}><Sparkles className="mr-2 h-3.5 w-3.5" />Reset to sample</Button>
+              <Button variant="outline" size="sm" onClick={resetToSample}><Sparkles className="mr-2 h-3.5 w-3.5" />Reset to sample</Button>
               <Button size="sm" onClick={savePrompt} disabled={saving || !name.trim() || !systemPrompt.trim() || !hasUnsavedChanges}><Save className="mr-2 h-3.5 w-3.5" />{saving ? "Saving…" : "Save prompt"}</Button>
             </div>
           </div>
