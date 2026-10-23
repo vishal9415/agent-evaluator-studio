@@ -94,8 +94,8 @@ export function VoiceSessionHistory({ refreshToken }: { refreshToken: number }) 
   }
 
   return (
-    <Card className="border-border/60 shadow-sm">
-      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <Card className="overflow-hidden rounded-[22px] border-[#e0e9e3] bg-white shadow-[0_12px_40px_-30px_rgba(16,43,37,0.35)]">
+      <CardHeader className="flex flex-col gap-3 border-b border-[#e5eee8] bg-[#f8faf9] px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-7">
         <div className="min-w-0">
           <CardTitle className="flex items-center gap-2 text-sm"><Clock3 className="h-4 w-4 text-brand" /> Recent voice sessions</CardTitle>
           <CardDescription className="mt-1.5 max-w-2xl text-xs leading-5">
@@ -106,7 +106,7 @@ export function VoiceSessionHistory({ refreshToken }: { refreshToken: number }) 
           <RefreshCw className={`mr-2 h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
         </Button>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-3 px-5 py-5 sm:px-7 sm:py-6">
         {loading && sessions.length === 0 ? (
           <div role="status" className="space-y-2" aria-label="Loading voice history">
             <div className="h-16 animate-pulse rounded-xl bg-muted/60" />
