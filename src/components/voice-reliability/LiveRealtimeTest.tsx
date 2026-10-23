@@ -285,6 +285,7 @@ export function LiveRealtimeTest() {
       const message = cause instanceof Error ? cause.message : "Unable to start the voice session.";
       setError(message);
       pushEvent("session.start_failed", message);
+      setHistoryRefreshToken((value) => value + 1);
       if (sessionIdRef.current) {
         void finalizeSession("error", "connection_failed");
       } else {
