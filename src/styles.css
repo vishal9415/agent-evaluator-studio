@@ -183,3 +183,11 @@ html {
   }
 }
 
+
+/* Authenticated product canvas: a quiet technical texture behind working surfaces. */
+.workspace-content {
+  background-color: var(--background);
+  background-image: radial-gradient(color-mix(in oklab, var(--foreground) 4%, transparent) 0.7px, transparent 0.7px);
+  background-size: 22px 22px;
+  background-attachment: fixed;
+}

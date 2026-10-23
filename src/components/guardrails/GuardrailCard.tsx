@@ -29,7 +29,7 @@ export function GuardrailCard({ g }: { g: Guardrail }) {
   };
 
   return (
-    <article className="group rounded-xl border border-border bg-card p-5 transition-all hover:border-foreground/20 hover:shadow-[0_1px_0_0_var(--border),0_8px_24px_-12px_color-mix(in_oklab,var(--foreground)_20%,transparent)]">
+    <article className="group flex h-full flex-col rounded-2xl border border-border/80 bg-card p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-lg">
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -62,7 +62,7 @@ export function GuardrailCard({ g }: { g: Guardrail }) {
         ))}
       </div>
 
-      <div className="mt-4 rounded-lg border border-border bg-muted/40">
+      <div className="mt-4 overflow-hidden rounded-xl border border-border/80 bg-muted/35">
         <div className="flex items-center justify-between border-b border-border px-3 py-1.5">
           <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">system prompt</span>
           <Button size="sm" variant="ghost" onClick={copy} className="h-7 gap-1.5 px-2 text-xs">
@@ -70,7 +70,7 @@ export function GuardrailCard({ g }: { g: Guardrail }) {
             {copied ? "Copied" : "Copy"}
           </Button>
         </div>
-        <pre className={`whitespace-pre-wrap px-3 py-2.5 font-mono text-[12px] leading-relaxed text-foreground ${expanded ? "" : "max-h-32 overflow-hidden"}`}>
+        <pre className={`whitespace-pre-wrap px-3 py-3 font-mono text-[11px] leading-6 text-foreground ${expanded ? "" : "max-h-32 overflow-hidden"}`}>
           {g.prompt}
         </pre>
         {g.prompt.length > 220 && (

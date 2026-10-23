@@ -234,16 +234,16 @@ function Playground() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-muted/40 via-background to-background">
+    <div className="min-h-full">
       <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-        <section className="mb-6 flex flex-col gap-4 border-b border-border/70 pb-6 sm:flex-row sm:items-end sm:justify-between">
+        <section className="relative mb-6 flex flex-col gap-4 overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 px-5 py-6 text-white shadow-xl shadow-slate-950/10 sm:flex-row sm:items-end sm:justify-between sm:px-8 sm:py-8">
           <div className="min-w-0">
-            <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-brand"><Sparkles className="h-3.5 w-3.5" /> Agent workspace</p>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Evaluation studio</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Configure the agent once, then test it manually, run risk scenarios, compare prompt versions, or export the setup.</p>
+            <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300"><Sparkles className="h-4 w-4" /> Agent workspace <span className="text-slate-600">/</span> Studio 01</p>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Evaluation studio</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base sm:leading-7">Configure once, then test conversations, probe failure cases, compare prompt versions, and keep the iterations that improve your agent.</p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${hasUnsavedChanges ? "border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-300" : "border-emerald-500/25 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300"}`}>
+            <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${hasUnsavedChanges ? "border-amber-300/25 bg-amber-300/10 text-amber-200" : "border-emerald-300/25 bg-emerald-300/10 text-emerald-200"}`}>
               <span className={`h-1.5 w-1.5 rounded-full ${hasUnsavedChanges ? "bg-amber-500" : "bg-emerald-500"}`} />
               {!promptId ? "New draft" : hasUnsavedChanges ? "Unsaved changes" : "Saved version"}
             </span>
@@ -251,7 +251,30 @@ function Playground() {
           </div>
         </section>
 
-        <section className="mb-6 overflow-hidden rounded-2xl border border-brand/20 bg-gradient-to-r from-brand/5 via-card to-card">
+        <section className="mb-6 grid grid-cols-2 gap-3 xl:grid-cols-4">
+          <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-sm">
+            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"><Cpu className="h-3.5 w-3.5 text-brand" /> Runtime</div>
+            <p className="mt-2 text-sm font-semibold tracking-tight">{model.startsWith("ollama/") ? "Local · Ollama" : "Hosted model"}</p>
+            <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{model.startsWith("ollama/") ? "Runs on your machine" : "Uses configured AI gateway"}</p>
+          </div>
+          <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-sm">
+            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"><Activity className="h-3.5 w-3.5 text-brand" /> Prompt size</div>
+            <p className="mt-2 text-sm font-semibold tracking-tight">{systemPrompt.length.toLocaleString()} <span className="font-normal text-muted-foreground">chars</span></p>
+            <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{stages.length} configured stage{stages.length === 1 ? "" : "s"}</p>
+          </div>
+          <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-sm">
+            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"><WandSparkles className="h-3.5 w-3.5 text-brand" /> Agent channel</div>
+            <p className="mt-2 text-sm font-semibold tracking-tight">{agentType === "voice" ? "Voice agent" : "Chat agent"}</p>
+            <p className="mt-1 text-[11px] leading-4 text-muted-foreground">Mode follows your configuration</p>
+          </div>
+          <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-sm">
+            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"><Save className="h-3.5 w-3.5 text-brand" /> Prompt library</div>
+            <p className="mt-2 text-sm font-semibold tracking-tight">{loadingSaved ? "Syncing…" : savedLoadError ? "Unavailable" : saved.length}</p>
+            <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{savedLoadError ? "Could not load saved prompts" : "Saved prompts in your workspace"}</p>
+          </div>
+        </section>
+
+        <section className="mb-6 overflow-hidden rounded-2xl border border-brand/20 bg-gradient-to-r from-brand/5 via-card to-card shadow-sm">
           <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-[1fr_auto] lg:items-center">
             <div>
               <p className="flex items-center gap-2 text-sm font-semibold"><WandSparkles className="h-4 w-4 text-brand" /> A simple evaluation loop</p>
