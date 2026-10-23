@@ -234,45 +234,41 @@ function Playground() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-muted/40 via-background to-background">
-      <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-        <section className="mb-6 flex flex-col gap-4 border-b border-border/70 pb-6 sm:flex-row sm:items-end sm:justify-between">
-          <div className="min-w-0">
-            <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-brand"><Sparkles className="h-3.5 w-3.5" /> Agent workspace</p>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Evaluation studio</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Configure the agent once, then test it manually, run risk scenarios, compare prompt versions, or export the setup.</p>
-          </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${hasUnsavedChanges ? "border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-300" : "border-emerald-500/25 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300"}`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${hasUnsavedChanges ? "bg-amber-500" : "bg-emerald-500"}`} />
-              {!promptId ? "New draft" : hasUnsavedChanges ? "Unsaved changes" : "Saved version"}
-            </span>
-            <Button variant="outline" size="sm" className="h-9 rounded-lg" onClick={() => setCoachOpen(true)}><Lightbulb className="mr-2 h-4 w-4 text-primary" />Improve prompt</Button>
-          </div>
-        </section>
-
-        <section className="mb-6 overflow-hidden rounded-2xl border border-brand/20 bg-gradient-to-r from-brand/5 via-card to-card">
-          <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-[1fr_auto] lg:items-center">
-            <div>
-              <p className="flex items-center gap-2 text-sm font-semibold"><WandSparkles className="h-4 w-4 text-brand" /> A simple evaluation loop</p>
-              <p className="mt-1.5 text-sm leading-6 text-muted-foreground">Start with the sample prompt, run a few scenarios, inspect what failed, then save a version when you’re ready to keep the change.</p>
-              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
-                <span className="inline-flex items-center gap-1.5"><span className="flex h-4 w-4 items-center justify-center rounded-full bg-brand/10 font-semibold text-brand">1</span> Configure</span>
-                <span className="inline-flex items-center gap-1.5"><span className="flex h-4 w-4 items-center justify-center rounded-full bg-brand/10 font-semibold text-brand">2</span> Test</span>
-                <span className="inline-flex items-center gap-1.5"><span className="flex h-4 w-4 items-center justify-center rounded-full bg-brand/10 font-semibold text-brand">3</span> Review & save</span>
+    <div className="min-h-screen bg-[#f5f8f6]">
+      <main className="mx-auto max-w-[1800px] px-4 pb-10 pt-5 sm:px-6 lg:px-8 lg:pb-12 lg:pt-8">
+        <section className="relative mb-6 overflow-hidden rounded-[28px] bg-[#102b25] px-5 py-6 text-white shadow-[0_24px_70px_-35px_rgba(16,43,37,0.65)] sm:px-8 sm:py-8 lg:px-10 lg:py-9">
+          <div className="pointer-events-none absolute -right-16 -top-24 h-80 w-80 rounded-full bg-emerald-300/10 blur-3xl" />
+          <div className="pointer-events-none absolute bottom-0 right-[18%] h-40 w-40 rounded-full bg-teal-400/[0.07] blur-3xl" />
+          <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+            <div className="min-w-0 max-w-3xl">
+              <p className="inline-flex items-center gap-2 rounded-full border border-emerald-200/20 bg-white/[0.06] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-100/80"><Sparkles className="h-3.5 w-3.5" /> Agent quality workspace</p>
+              <h1 className="mt-4 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl lg:text-[42px]">Evaluation studio<span className="text-emerald-300">.</span></h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-white/65 sm:text-base sm:leading-7">Tune your agent, run realistic conversations, catch risky behavior, and keep a clean record of every prompt change.</p>
+              <div className="mt-5 flex flex-wrap items-center gap-2">
+                <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${hasUnsavedChanges ? "border-amber-200/25 bg-amber-300/10 text-amber-100" : "border-emerald-200/25 bg-emerald-300/10 text-emerald-100"}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${hasUnsavedChanges ? "bg-amber-300" : "bg-emerald-300"}`} />
+                  {!promptId ? "New draft" : hasUnsavedChanges ? "Unsaved changes" : "Saved version"}
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs text-white/65"><Cpu className="h-3.5 w-3.5 text-emerald-200" />{MODELS.find((item) => item.value === model)?.label ?? model}</span>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2 lg:justify-end">
-              <Button variant="outline" size="sm" onClick={resetToSample}><Sparkles className="mr-2 h-3.5 w-3.5" />Reset to sample</Button>
-              <Button size="sm" onClick={savePrompt} disabled={saving || !name.trim() || !systemPrompt.trim() || !hasUnsavedChanges}><Save className="mr-2 h-3.5 w-3.5" />{saving ? "Saving…" : "Save prompt"}</Button>
+            <div className="relative flex shrink-0 flex-wrap gap-2">
+              <Button variant="outline" size="sm" className="h-10 rounded-xl border-white/15 bg-white/[0.06] text-white hover:bg-white/[0.12] hover:text-white" onClick={() => setCoachOpen(true)}><Lightbulb className="mr-2 h-4 w-4 text-emerald-200" />Improve prompt</Button>
+              <Button size="sm" className="h-10 rounded-xl bg-emerald-300 px-4 font-semibold text-[#12382d] hover:bg-emerald-200" onClick={savePrompt} disabled={saving || !name.trim() || !systemPrompt.trim() || !hasUnsavedChanges}><Save className="mr-2 h-3.5 w-3.5" />{saving ? "Saving…" : promptId ? "Save version" : "Save prompt"}</Button>
             </div>
+          </div>
+          <div className="relative mt-8 grid grid-cols-2 gap-2 border-t border-white/10 pt-5 sm:grid-cols-4 sm:gap-3">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3.5 sm:p-4"><p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/45">Current agent</p><p className="mt-2 text-sm font-semibold capitalize sm:text-base">{agentType} agent</p><p className="mt-1 text-[11px] text-white/45">Selected test format</p></div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3.5 sm:p-4"><p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/45">Prompt size</p><p className="mt-2 text-sm font-semibold tabular-nums sm:text-base">{systemPrompt.length.toLocaleString()} <span className="text-xs font-normal text-white/55">chars</span></p><p className="mt-1 text-[11px] text-white/45">System instructions</p></div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3.5 sm:p-4"><p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/45">Saved prompts</p><p className="mt-2 text-sm font-semibold tabular-nums sm:text-base">{loadingSaved ? "…" : saved.length}</p><p className="mt-1 text-[11px] text-white/45">In your workspace</p></div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3.5 sm:p-4"><p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/45">Workflow</p><p className="mt-2 text-sm font-semibold sm:text-base">Configure → Test</p><p className="mt-1 text-[11px] text-white/45">Review → Save</p></div>
           </div>
         </section>
 
-        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(320px,400px)_minmax(0,1fr)] lg:gap-6">
+        <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(340px,430px)_minmax(0,1fr)] xl:gap-6">
         {/* Left: configuration */}
-        <Card className="self-start overflow-hidden border-border/70 shadow-sm">
-          <CardHeader className="border-b border-border/70 bg-muted/20 pb-4">
+        <Card className="self-start overflow-hidden rounded-[24px] border-[#e0e9e3] bg-white shadow-[0_12px_40px_-28px_rgba(16,43,37,0.35)]">
+          <CardHeader className="border-b border-[#e5eee8] bg-[#f7faf8] px-5 pb-5 pt-5 sm:px-6">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <CardTitle className="flex items-center gap-2 text-sm font-semibold"><Cpu className="h-4 w-4 text-brand" /> Agent configuration</CardTitle>
@@ -281,7 +277,7 @@ function Playground() {
               <span className="rounded-full bg-muted px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Step 1</span>
             </div>
           </CardHeader>
-          <CardContent className="space-y-5">
+          <CardContent className="space-y-5 px-5 py-5 sm:px-6 sm:py-6">
             <div className="space-y-1.5">
               <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                 Saved prompts
@@ -450,7 +446,7 @@ function Playground() {
         </Card>
 
         {/* Right: testing surfaces */}
-        <div className="min-w-0 space-y-4">
+        <div className="min-w-0 space-y-5">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-brand"><Activity className="h-3.5 w-3.5" /> Step 2 · Test & review</p>
@@ -460,14 +456,14 @@ function Playground() {
             <span className="inline-flex w-fit items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground"><span className={`h-1.5 w-1.5 rounded-full ${hasUnsavedChanges ? "bg-amber-500" : "bg-emerald-500"}`} />{hasUnsavedChanges ? "Draft configuration" : "Saved configuration"}</span>
           </div>
           <Tabs defaultValue="manual">
-            <TabsList className="h-auto min-h-10 max-w-full flex-wrap rounded-xl bg-muted/60 p-1">
-              <TabsTrigger value="manual" className="rounded-lg px-4 text-xs font-medium">
+            <TabsList className="h-auto min-h-12 w-full flex-wrap justify-start gap-1 rounded-2xl border border-[#e0e9e3] bg-white p-1.5 shadow-sm">
+              <TabsTrigger value="manual" className="rounded-xl px-4 py-2.5 text-xs font-semibold data-[state=active]:bg-[#153b30] data-[state=active]:text-white data-[state=active]:shadow-sm">
                 Manual testing
               </TabsTrigger>
               <TabsTrigger value="auto" className="rounded-lg px-4 text-xs font-medium">
                 Auto-eval
               </TabsTrigger>
-              <TabsTrigger value="compare" className="rounded-lg px-3 text-xs font-medium">
+              <TabsTrigger value="compare" className="rounded-xl px-3 py-2.5 text-xs font-semibold data-[state=active]:bg-[#153b30] data-[state=active]:text-white data-[state=active]:shadow-sm">
                 Compare
               </TabsTrigger>
               <TabsTrigger value="export" className="rounded-lg px-3 text-xs font-medium">
