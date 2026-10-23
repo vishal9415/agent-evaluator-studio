@@ -61,7 +61,7 @@ function Layout() {
 
       <aside
         aria-label="PromptLab workspace"
-        className={\`fixed inset-y-0 left-0 z-50 flex w-[264px] flex-col border-r border-white/10 bg-[#0b1220] text-white shadow-2xl shadow-slate-950/10 transition-transform duration-200 md:translate-x-0 \${mobileOpen ? "translate-x-0" : "-translate-x-full"}\`}
+        className={`fixed inset-y-0 left-0 z-50 flex w-[264px] flex-col border-r border-white/10 bg-[#0b1220] text-white shadow-2xl shadow-slate-950/10 transition-transform duration-200 md:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className="flex h-[76px] items-center gap-3 border-b border-white/10 px-5">
           <Link to="/" onClick={() => setMobileOpen(false)} className="group flex min-w-0 items-center gap-3" aria-label="PromptLab home">
