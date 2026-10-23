@@ -53,6 +53,30 @@ The authenticated app contains:
 
 The Voice Reliability Lab connects to OpenAI Realtime through server-side SDP negotiation. It persists session metadata and event timing only; raw audio and transcript text are not stored. A browser-observed speech-stop-to-response-created gap is not provider processing latency or time-to-audible response.
 
+### Free local models with Ollama
+
+PromptLab includes two optional local chat models that do not require a paid model API:
+
+- `ollama/qwen3:4b` — recommended first try; downloads about 2.5 GB.
+- `ollama/llama3.2:3b` — smaller alternative; downloads about 2 GB.
+
+These run on your own Mac using Ollama's local OpenAI-compatible API. They do not charge per-token API fees, though they use local memory, compute, electricity, and disk space. Model quality and speed depend on your hardware.
+
+1. Install and open [Ollama for macOS](https://ollama.com/download).
+2. In Terminal, download one or both models:
+
+   ```sh
+   ollama pull qwen3:4b
+   ollama pull llama3.2:3b
+   ```
+
+3. Leave Ollama running, then start PromptLab with `npm run dev`.
+4. In the model selector, choose a model labelled **Local · … (Ollama, free)**.
+
+PromptLab connects to `http://127.0.0.1:11434/v1` by default. Override this with the server-only `OLLAMA_BASE_URL` environment variable if your local Ollama endpoint differs. The app routes manual chat, Prompt Coach, scenario generation, evaluation judges/summaries, and comparison support calls to the selected local model when a local model is chosen. For prompt comparisons, choose local models for both variants to keep both sides of the comparison local. Existing hosted model choices remain on the Lovable AI gateway.
+
+The initial local connection uses Ollama's OpenAI-compatible `/v1/chat/completions` endpoint. Tool-calling reliability varies by model; Qwen3 is the recommended first model for automated evaluations. Live audio in Voice Reliability Lab still uses OpenAI Realtime and is a separate, paid provider path.
+
 ### Supabase migrations and local pilot allowance
 
 For a fresh Supabase development project, apply **all migration files** in `supabase/migrations/` in timestamp order. The older migrations create the initial prompts/evaluations/scenarios and profile schema; the later migrations add ownership, prompt versions, voice session history, the usage ledger, and owner-scoped prompt comparisons. Applying only the four newest files to an empty project will fail because they depend on the earlier schema.
