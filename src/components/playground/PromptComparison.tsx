@@ -64,6 +64,7 @@ export function PromptComparison({ systemPrompt, model, agentType, hasStages, on
   const delta = active ? comparisonDeltas(active.results) : null;
   const metricsA = active ? pairedMetrics(active.results, "a") : null;
   const metricsB = active ? pairedMetrics(active.results, "b") : null;
+  const usesOnlyLocalModels = a.model.startsWith("ollama/") && b.model.startsWith("ollama/");
 
   function exportResults() {
     if (!active) return;
@@ -93,6 +94,11 @@ export function PromptComparison({ systemPrompt, model, agentType, hasStages, on
         <Button variant="outline" size="sm" disabled={busy} onClick={() => set({ ...value, systemPrompt, model })}><Copy className="mr-2 h-3.5 w-3.5" /> Use current system prompt</Button>
       </div>)}
     </div>
+    <p className={`rounded-lg border px-3 py-2.5 text-xs leading-5 ${usesOnlyLocalModels ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-800 dark:text-emerald-200" : "border-amber-500/25 bg-amber-500/5 text-amber-800 dark:text-amber-200"}`}>
+      {usesOnlyLocalModels
+        ? "Both variants use local Ollama models. Text inference does not incur per-token model API fees, but runs use your machine's compute and memory."
+        : "At least one variant uses a hosted model. Requests may consume AI gateway/provider credits; select a Local · Ollama model for both variants to keep model inference local."}
+    </p>
     {hasStages && <p className="text-xs text-muted-foreground">System-prompt comparison only. Begin messages, stage transitions and voice timing are not evaluated.</p>}
     {agentType === "voice" && <p className="text-xs text-muted-foreground">Voice scenarios are evaluated as transcripts, not audio or interruption latency.</p>}
     <div className="grid gap-3 sm:grid-cols-[1fr_110px]">
