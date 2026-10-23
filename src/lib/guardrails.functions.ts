@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { callGateway } from "./playground.functions";
 import { GUARDRAILS } from "./guardrails-data";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const inputSchema = z.object({
   useCase: z.string().trim().min(20).max(4000),
