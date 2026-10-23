@@ -566,7 +566,7 @@ export type Database = {
         Args: {
           p_change_note?: string
           p_payload: Json
-          p_prompt_id: string
+          p_prompt_id: string | null
           p_user_id: string
         }
         Returns: {
