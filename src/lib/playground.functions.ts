@@ -62,6 +62,56 @@ export async function callGateway(body: Record<string, unknown>, attempt = 0): P
   return res.json();
 }
 
+/** Whether a model ID refers to local Ollama inference. */
+export function isLocalOllamaModel(model: string): boolean {
+  return model.startsWith("ollama/");
+}
+
+/** Use local inference for supporting evaluation steps when a local model is selected. */
+export function taskModel(selected: string, fallback: string): string {
+  return isLocalOllamaModel(selected) ? selected : fallback;
+}
+
+/** Chat-completions adapter for local Ollama models; no external API key is required. */
+export async function callModel(body: Record<string, unknown>, attempt = 0): Promise<any> {
+  const selected = typeof body.model === "string" ? body.model : "";
+  if (!isLocalOllamaModel(selected)) return callGateway(body, attempt);
+
+  const model = selected.slice("ollama/".length);
+  const base = (process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434/v1").replace(/\/+$/, "");
+  let response: Response;
+  try {
+    const requestBody = { ...body, model } as Record<string, unknown>;
+    delete requestBody.tool_choice;
+    response = await fetch(`${base}/chat/completions`, {
+      method: "POST",
+      headers: { Authorization: "Bearer ollama", "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody),
+    });
+  } catch {
+    throw new Error(`Ollama is not reachable at ${base}. Open Ollama, then run: ollama pull ${model}`);
+  }
+  if (!response.ok) {
+    const details = await response.text().catch(() => "");
+    if (response.status === 404 || /model .* not found/i.test(details)) {
+      throw new Error(`Model ${model} is not installed. Run: ollama pull ${model}`);
+    }
+    throw new Error(`Ollama request failed (HTTP ${response.status}). Check that Ollama is running.`);
+  }
+  const result = await response.json();
+  const choice = result?.choices?.[0];
+  const message = choice?.message;
+  const firstTool = Array.isArray(body.tools) ? (body.tools[0] as any) : undefined;
+  if (choice && message && !Array.isArray(message.tool_calls) && typeof message.content === "string" && firstTool?.function?.name) {
+    try {
+      message.tool_calls = [{ type: "function", function: { name: firstTool.function.name, arguments: JSON.stringify(JSON.parse(message.content)) } }];
+    } catch {
+      // Preserve a normal model response if it didn't return JSON.
+    }
+  }
+  return result;
+}
+
 /** Chat completion for the manual chat playground (stage-aware). */
 export const chatCompletion = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -120,7 +170,7 @@ export const chatCompletion = createServerFn({ method: "POST" })
         }))
       : undefined;
 
-    const json = await callGateway({
+    const json = await callModel({
       model: data.model,
       messages,
       ...(tools ? { tools } : {}),
