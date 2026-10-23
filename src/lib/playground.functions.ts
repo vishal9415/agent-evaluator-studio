@@ -225,7 +225,7 @@ export const publicDemoChatCompletion = createServerFn({ method: "POST" })
   });
 
 /** Generate N scenarios for the given prompt + agent type. */
-export async function generateScenarios(systemPrompt: string, agentType: string, count: number, suiteFocus = "") {
+export async function generateScenarios(systemPrompt: string, agentType: string, count: number, suiteFocus = "", selectedModel = "google/gemini-2.5-flash") {
   const tools = [
     {
       type: "function",
@@ -269,8 +269,8 @@ Given the agent's system prompt, generate ${count} diverse, realistic scenarios 
 Each scenario must include: category, user_goal (what the test user wants), expected_behavior (what a good agent would do), opening_message (the first user message to send).
 ${suiteFocus ? `\nSUITE FOCUS (overrides the default mix above):\n${suiteFocus}\nUse specific, short category labels (e.g. "Prompt injection", "PII extraction", "Medical advice").` : ""}`;
 
-  const json = await callGateway({
-    model: "google/gemini-2.5-flash",
+  const json = await callModel({
+    model: taskModel(selectedModel, "google/gemini-2.5-flash"),
     messages: [
       { role: "system", content: sys },
       { role: "user", content: `Agent system prompt:\n"""\n${systemPrompt}\n"""\n\nReturn exactly ${count} scenarios.` },
@@ -302,7 +302,7 @@ export async function runAndJudgeScenario(
 
   // Up to 3 user turns total (opening + 2 follow-ups)
   for (let turn = 0; turn < 3; turn++) {
-    const json = await callGateway({ model, messages: convo });
+    const json = await callModel({ model, messages: convo });
     const assistant = json?.choices?.[0]?.message?.content ?? "";
     convo.push({ role: "assistant", content: assistant });
     if (turn === 2) break;
@@ -315,8 +315,8 @@ export async function runAndJudgeScenario(
     }
 
     // Generate next user turn as a simulated user pursuing the goal
-    const simJson = await callGateway({
-      model: "google/gemini-2.5-flash-lite",
+    const simJson = await callModel({
+      model: taskModel(model, "google/gemini-2.5-flash-lite"),
       messages: [
         {
           role: "system",
@@ -359,8 +359,8 @@ export async function runAndJudgeScenario(
       },
     },
   ];
-  const judge = await callGateway({
-    model: "google/gemini-2.5-flash",
+  const judge = await callModel({
+    model: taskModel(model, "google/gemini-2.5-flash"),
     messages: [
       {
         role: "system",
@@ -484,7 +484,7 @@ export const runEvaluation = createServerFn({ method: "POST" })
       // 2. Generate scenarios
       const { getSuite, computeReadiness, promptFingerprint } = await import("@/lib/eval-suites");
       const suite = getSuite(data.suite);
-      const scenarios = await generateScenarios(data.systemPrompt, data.agentType, data.scenarioCount, suite.focus);
+      const scenarios = await generateScenarios(data.systemPrompt, data.agentType, data.scenarioCount, suite.focus, data.model);
 
       // Insert pending rows
       await supabaseAdmin.from("scenarios").insert(
@@ -596,8 +596,8 @@ export const runEvaluation = createServerFn({ method: "POST" })
         },
       ];
 
-      const sumJson = await callGateway({
-        model: "google/gemini-2.5-pro",
+      const sumJson = await callModel({
+        model: taskModel(data.model, "google/gemini-2.5-pro"),
         messages: [
           {
             role: "system",
@@ -836,7 +836,7 @@ export const coachSuggest = createServerFn({ method: "POST" })
       ...data.stages.map((s) => `stage:${s.id}`),
     ];
 
-    const json = await callGateway({
+    const json = await callModel({
       model: data.model,
       messages: [
         {
