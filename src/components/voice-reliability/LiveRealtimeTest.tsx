@@ -11,6 +11,7 @@ import type { VoiceEventSource } from "@/lib/voice-adapters/contract";
 import { finishVoiceSession, recordVoiceSessionEvent } from "@/lib/voice-session.functions";
 import { VoiceSessionHistory } from "@/components/voice-reliability/VoiceSessionHistory";
 import { VoiceUsagePanel } from "@/components/voice-reliability/VoiceUsagePanel";
+import { waitForIceGatheringComplete } from "@/lib/voice-adapters/ice-gathering";
 
 type SessionState = "idle" | "connecting" | "connected" | "ended" | "error";
 type TimelineEvent = { id: number; time: string; elapsedMs: number; type: string; detail: string };
@@ -267,6 +268,7 @@ export function LiveRealtimeTest() {
 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
+      await waitForIceGatheringComplete(pc);
       const localSdp = pc.localDescription?.sdp;
       if (!localSdp) throw new Error("Could not create a WebRTC offer.");
 
