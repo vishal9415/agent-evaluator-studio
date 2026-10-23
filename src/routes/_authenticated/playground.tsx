@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Lightbulb, Save, Sparkles } from "lucide-react";
+import { Activity, CheckCircle2, Cpu, GitCompareArrows, Lightbulb, Loader2, Save, Sparkles, WandSparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { listPrompts, savePrompt as savePromptFn } from "@/lib/playground-data.functions";
@@ -95,10 +94,22 @@ function Playground() {
   const [promptId, setPromptId] = useState<string | null>(null);
   const [saved, setSaved] = useState<SavedPrompt[]>([]);
   const [saving, setSaving] = useState(false);
+  const [loadingSaved, setLoadingSaved] = useState(true);
+  const [savedLoadError, setSavedLoadError] = useState(false);
   const [coachOpen, setCoachOpen] = useState(false);
   const [versionRefreshKey, setVersionRefreshKey] = useState(0);
-
+  const [savedSignature, setSavedSignature] = useState<string | null>(null);
   const variables = textToVars(varsText);
+  const currentSignature = JSON.stringify({
+    name,
+    system_prompt: systemPrompt,
+    model,
+    agent_type: agentType,
+    begin_message: beginMessage,
+    stages,
+    variables,
+  });
+  const hasUnsavedChanges = savedSignature !== currentSignature;
   const fetchPrompts = useServerFn(listPrompts);
   const persistPrompt = useServerFn(savePromptFn);
 
@@ -108,11 +119,15 @@ function Playground() {
   }, []);
 
   async function refreshSaved() {
+    setLoadingSaved(true);
     try {
       const data = await fetchPrompts();
       setSaved(data as unknown as SavedPrompt[]);
+      setSavedLoadError(false);
     } catch {
-      /* ignore */
+      setSavedLoadError(true);
+    } finally {
+      setLoadingSaved(false);
     }
   }
 
@@ -134,6 +149,7 @@ function Playground() {
         },
       });
       if (res.id) setPromptId(res.id);
+      setSavedSignature(currentSignature);
       setVersionRefreshKey((value) => value + 1);
       toast.success(res.versionNumber ? `Saved as version ${res.versionNumber}` : "Saved");
       void refreshSaved();
@@ -155,14 +171,45 @@ function Playground() {
     setVarsText(varsToText(snapshot.variables ?? {}));
   }
 
+  function confirmDiscardDraft() {
+    const isPristineNewDraft =
+      !promptId &&
+      name === "Untitled prompt" &&
+      beginMessage === DEFAULT_BEGIN_MESSAGE &&
+      systemPrompt === DEFAULT_PROMPT &&
+      stages.length === 0 &&
+      model === MODELS[0].value &&
+      agentType === "chat" &&
+      varsText === "lead_name=Priya";
+    if (!hasUnsavedChanges || isPristineNewDraft) return true;
+    return window.confirm("You have unsaved prompt changes. Discard them and continue?");
+  }
+
+  function resetToSample() {
+    if (!confirmDiscardDraft()) return;
+    setName("Untitled prompt");
+    setBeginMessage(DEFAULT_BEGIN_MESSAGE);
+    setSystemPrompt(DEFAULT_PROMPT);
+    setStages([]);
+    setModel(MODELS[0].value);
+    setAgentType("chat");
+    setVarsText("lead_name=Priya");
+    setPromptId(null);
+    setSavedSignature(null);
+  }
+
   function loadPrompt(id: string) {
+    if (id !== (promptId ?? "__new__") && !confirmDiscardDraft()) return;
     if (id === "__new__") {
       setPromptId(null);
       setName("Untitled prompt");
       setSystemPrompt(DEFAULT_PROMPT);
       setBeginMessage(DEFAULT_BEGIN_MESSAGE);
       setStages([]);
+      setModel(MODELS[0].value);
+      setAgentType("chat");
       setVarsText("lead_name=Priya");
+      setSavedSignature(null);
       return;
     }
     const p = saved.find((x) => x.id === id);
@@ -175,49 +222,64 @@ function Playground() {
     setBeginMessage(p.begin_message ?? "");
     setStages(Array.isArray(p.stages) ? p.stages : []);
     setVarsText(varsToText((p.variables ?? {}) as Record<string, string>));
+    setSavedSignature(JSON.stringify({
+      name: p.name,
+      system_prompt: p.system_prompt,
+      model: p.model,
+      agent_type: p.agent_type,
+      begin_message: p.begin_message ?? "",
+      stages: Array.isArray(p.stages) ? p.stages : [],
+      variables: (p.variables ?? {}) as Record<string, string>,
+    }));
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-muted/40 via-background to-background">
-      <Toaster richColors position="top-right" />
-      <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-              <Sparkles className="h-4 w-4" />
-            </div>
-            <div>
-              <h1 className="text-base font-semibold leading-tight tracking-tight">
-                Agent Playground
-              </h1>
-              <p className="text-xs text-muted-foreground">
-                Test conversational prompts — manually or with auto-generated scenarios
-              </p>
-            </div>
+      <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <section className="mb-6 flex flex-col gap-4 border-b border-border/70 pb-6 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
+            <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-brand"><Sparkles className="h-3.5 w-3.5" /> Agent workspace</p>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Evaluation studio</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Configure the agent once, then test it manually, run risk scenarios, compare prompt versions, or export the setup.</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 rounded-lg"
-              onClick={() => setCoachOpen(true)}
-            >
-              <Lightbulb className="mr-2 h-4 w-4 text-primary" />
-              Improve prompt
-            </Button>
-            <div className="hidden items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs text-muted-foreground md:flex">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              Ready
-            </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${hasUnsavedChanges ? "border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-300" : "border-emerald-500/25 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300"}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${hasUnsavedChanges ? "bg-amber-500" : "bg-emerald-500"}`} />
+              {!promptId ? "New draft" : hasUnsavedChanges ? "Unsaved changes" : "Saved version"}
+            </span>
+            <Button variant="outline" size="sm" className="h-9 rounded-lg" onClick={() => setCoachOpen(true)}><Lightbulb className="mr-2 h-4 w-4 text-primary" />Improve prompt</Button>
           </div>
-        </div>
-      </header>
+        </section>
 
-      <main className="mx-auto grid max-w-7xl grid-cols-1 gap-6 p-6 lg:grid-cols-[440px_1fr]">
+        <section className="mb-6 overflow-hidden rounded-2xl border border-brand/20 bg-gradient-to-r from-brand/5 via-card to-card">
+          <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-[1fr_auto] lg:items-center">
+            <div>
+              <p className="flex items-center gap-2 text-sm font-semibold"><WandSparkles className="h-4 w-4 text-brand" /> A simple evaluation loop</p>
+              <p className="mt-1.5 text-sm leading-6 text-muted-foreground">Start with the sample prompt, run a few scenarios, inspect what failed, then save a version when you’re ready to keep the change.</p>
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5"><span className="flex h-4 w-4 items-center justify-center rounded-full bg-brand/10 font-semibold text-brand">1</span> Configure</span>
+                <span className="inline-flex items-center gap-1.5"><span className="flex h-4 w-4 items-center justify-center rounded-full bg-brand/10 font-semibold text-brand">2</span> Test</span>
+                <span className="inline-flex items-center gap-1.5"><span className="flex h-4 w-4 items-center justify-center rounded-full bg-brand/10 font-semibold text-brand">3</span> Review & save</span>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 lg:justify-end">
+              <Button variant="outline" size="sm" onClick={resetToSample}><Sparkles className="mr-2 h-3.5 w-3.5" />Reset to sample</Button>
+              <Button size="sm" onClick={savePrompt} disabled={saving || !name.trim() || !systemPrompt.trim() || !hasUnsavedChanges}><Save className="mr-2 h-3.5 w-3.5" />{saving ? "Saving…" : "Save prompt"}</Button>
+            </div>
+          </div>
+        </section>
+
+        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(320px,400px)_minmax(0,1fr)] lg:gap-6">
         {/* Left: configuration */}
-        <Card className="self-start border-border/60 shadow-sm">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-sm font-semibold">Configuration</CardTitle>
+        <Card className="self-start overflow-hidden border-border/70 shadow-sm">
+          <CardHeader className="border-b border-border/70 bg-muted/20 pb-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-sm font-semibold"><Cpu className="h-4 w-4 text-brand" /> Agent configuration</CardTitle>
+                <p className="mt-1.5 text-xs leading-5 text-muted-foreground">Set up the prompt and the context used by each test.</p>
+              </div>
+              <span className="rounded-full bg-muted px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Step 1</span>
+            </div>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="space-y-1.5">
@@ -226,7 +288,7 @@ function Playground() {
               </Label>
               <Select value={promptId ?? "__new__"} onValueChange={loadPrompt}>
                 <SelectTrigger className="h-10 rounded-lg">
-                  <SelectValue placeholder="New prompt" />
+                  <SelectValue placeholder={loadingSaved ? "Loading saved prompts…" : "New prompt"} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__new__">+ New prompt</SelectItem>
@@ -237,6 +299,8 @@ function Playground() {
                   ))}
                 </SelectContent>
               </Select>
+              {savedLoadError && <p role="status" className="text-xs leading-5 text-destructive">Saved prompts could not be loaded. Check your connection, then refresh the page.</p>}
+              {!loadingSaved && !savedLoadError && saved.length === 0 && <p className="text-xs leading-5 text-muted-foreground">No saved prompts yet. Save your first setup to find it here later.</p>}
             </div>
 
             <div className="space-y-1.5">
@@ -290,6 +354,12 @@ function Playground() {
                 </Select>
               </div>
             </div>
+            <p className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs leading-5 text-muted-foreground">
+              {model.startsWith("ollama/") ? <Cpu className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand" /> : <Activity className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand" />}
+              {model.startsWith("ollama/")
+                ? "Local model selected. Text inference is routed to Ollama on the machine running this app and does not incur per-token model API fees."
+                : "Hosted model selected. Requests use your configured AI gateway and may consume provider credits. Choose a Local · Ollama model to avoid model API token charges."}
+            </p>
 
             <div className="space-y-1.5">
               <Label
@@ -366,10 +436,11 @@ function Playground() {
               Suggest improvements
             </Button>
 
-            <Button onClick={savePrompt} disabled={saving} className="h-10 w-full rounded-lg">
-              <Save className="mr-2 h-4 w-4" />
-              {promptId ? "Save new version" : "Save prompt"}
+            <Button onClick={savePrompt} disabled={saving || !name.trim() || !systemPrompt.trim() || !hasUnsavedChanges} className="h-10 w-full rounded-lg">
+              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              {saving ? "Saving…" : promptId ? "Save new version" : "Save prompt"}
             </Button>
+            {hasUnsavedChanges && <p className="text-center text-[11px] leading-5 text-muted-foreground">Changes in this editor are a draft until you save them.</p>}
             <PromptVersionHistory
               promptId={promptId}
               refreshToken={versionRefreshKey}
@@ -379,7 +450,15 @@ function Playground() {
         </Card>
 
         {/* Right: testing surfaces */}
-        <div className="min-w-0">
+        <div className="min-w-0 space-y-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-brand"><Activity className="h-3.5 w-3.5" /> Step 2 · Test & review</p>
+              <h2 className="mt-1 text-xl font-semibold tracking-tight">Test your agent</h2>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">Choose a test mode. Your current prompt and model selection will carry through.</p>
+            </div>
+            <span className="inline-flex w-fit items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground"><span className={`h-1.5 w-1.5 rounded-full ${hasUnsavedChanges ? "bg-amber-500" : "bg-emerald-500"}`} />{hasUnsavedChanges ? "Draft configuration" : "Saved configuration"}</span>
+          </div>
           <Tabs defaultValue="manual">
             <TabsList className="h-auto min-h-10 max-w-full flex-wrap rounded-xl bg-muted/60 p-1">
               <TabsTrigger value="manual" className="rounded-lg px-4 text-xs font-medium">
@@ -396,6 +475,7 @@ function Playground() {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="manual" className="mt-4">
+              <div className="mb-3 flex items-start gap-2 rounded-lg border border-border bg-card/70 p-3 text-xs leading-5 text-muted-foreground"><CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand" /><span>Best for quick iteration. Test one turn at a time and refine your instructions before running a larger evaluation. Speech features may use separate speech-provider settings from your selected text model.</span></div>
               <ManualChat
                 key={`${promptId ?? "new"}-${model}-${agentType}`}
                 systemPrompt={systemPrompt}
@@ -407,6 +487,7 @@ function Playground() {
               />
             </TabsContent>
             <TabsContent value="auto" className="mt-4">
+              <div className="mb-3 flex items-start gap-2 rounded-lg border border-border bg-card/70 p-3 text-xs leading-5 text-muted-foreground"><Activity className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand" /><span>Start with 5 scenarios to validate the setup. Expand to 10 or 50 when you're ready for broader coverage. Model-based scores are estimates that should be reviewed with the conversation evidence.</span></div>
               <AutoEval
                 systemPrompt={
                   stages.length
@@ -420,6 +501,7 @@ function Playground() {
               />
             </TabsContent>
             <TabsContent value="compare" className="mt-4">
+              <div className="mb-3 flex items-start gap-2 rounded-lg border border-border bg-card/70 p-3 text-xs leading-5 text-muted-foreground"><GitCompareArrows className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand" /><span>Change one prompt or model at a time where possible. Local comparisons can avoid per-token model API charges by selecting local models for both variants.</span></div>
               <PromptComparison systemPrompt={systemPrompt} model={model} agentType={agentType}
                 hasStages={stages.length > 0} onApply={setSystemPrompt} />
             </TabsContent>
@@ -427,6 +509,7 @@ function Playground() {
               <VoiceExport input={{ name, systemPrompt, beginMessage, model, agentType, stages, variables }} />
             </TabsContent>
           </Tabs>
+        </div>
         </div>
       </main>
 

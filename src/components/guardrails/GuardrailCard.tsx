@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { Check, Copy, Shield, AlertTriangle, AlertOctagon, Info } from "lucide-react";
 import type { Guardrail, Severity } from "@/lib/guardrails-data";
 import { Badge } from "@/components/ui/badge";
@@ -17,9 +18,14 @@ export function GuardrailCard({ g }: { g: Guardrail }) {
   const sev = severityMeta[g.severity];
 
   const copy = async () => {
-    await navigator.clipboard.writeText(g.prompt);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    try {
+      await navigator.clipboard.writeText(g.prompt);
+      setCopied(true);
+      toast.success("Guardrail copied", { description: "Paste it into your prompt editor and adapt it to your agent." });
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast.error("Clipboard access is unavailable", { description: "Open this page in a secure browser context and try again." });
+    }
   };
 
   return (

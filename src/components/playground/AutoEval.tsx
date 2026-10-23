@@ -54,6 +54,7 @@ export function AutoEval({ systemPrompt, model, agentType, promptId, onApplyImpr
   const [evalRow, setEvalRow] = useState<EvalRow | null>(null);
   const [scenarios, setScenarios] = useState<ScenarioRow[]>([]);
   const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [suite, setSuite] = useState<SuiteId>(DEFAULT_SUITE);
   const run = useServerFn(runEvaluation);
@@ -86,9 +87,11 @@ export function AutoEval({ systemPrompt, model, agentType, promptId, onApplyImpr
 
   const start = async (count: number) => {
     if (!systemPrompt.trim()) {
+      setStartError("Add a system prompt in the configuration panel before running an evaluation.");
       toast.error("Add a system prompt first.");
       return;
     }
+    setStartError("");
     setStarting(true);
     setEvalRow(null);
     setScenarios([]);
@@ -99,9 +102,11 @@ export function AutoEval({ systemPrompt, model, agentType, promptId, onApplyImpr
       });
       setActiveEvalId(res.evaluationId);
       qc.invalidateQueries({ queryKey: ["evaluations"] });
-      toast.success("Evaluation complete");
+      toast.success("Evaluation started", { description: "Results will appear here as scenarios are processed." });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Evaluation failed");
+      const message = e instanceof Error ? e.message : "Evaluation failed";
+      setStartError(message);
+      toast.error(message);
     } finally {
       setStarting(false);
     }
@@ -139,39 +144,35 @@ export function AutoEval({ systemPrompt, model, agentType, promptId, onApplyImpr
 
   return (
     <div className="space-y-4">
-      <Card className="overflow-hidden border-border/60 shadow-sm">
-        <CardHeader className="flex flex-row items-start justify-between space-y-0 gap-4 pb-4">
-          <div>
-            <CardTitle className="text-sm font-semibold">Automatic evaluation</CardTitle>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Generate scenarios, run them, score effectiveness + hallucination, and get prompt suggestions.
+      <Card className="overflow-hidden border-border/70 shadow-sm">
+        <CardHeader className="flex flex-col gap-4 pb-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold"><ShieldCheck className="h-4 w-4 text-brand" /> Automatic evaluation</CardTitle>
+            <p className="mt-1.5 max-w-2xl text-xs leading-5 text-muted-foreground">
+              Generate scenarios, test behavior, score effectiveness and hallucination indicators, then review the evidence and suggestions.
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <Button onClick={() => start(5)} disabled={!!running} variant="outline" size="sm" className="rounded-lg">
-              {running && evalRow?.scenario_count === 5 ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <><Play className="mr-1.5 h-3.5 w-3.5" />Run 5</>
-              )}
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:shrink-0 sm:justify-end">
+            <Button onClick={() => start(5)} disabled={!!running || !systemPrompt.trim()} variant="outline" size="sm" className="min-w-0 flex-1 rounded-lg sm:flex-none">
+              {running && evalRow?.scenario_count === 5 ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Play className="mr-1.5 h-3.5 w-3.5" />}Run 5
             </Button>
-            <Button onClick={() => start(10)} disabled={!!running} variant="outline" size="sm" className="rounded-lg">
-              {running && evalRow?.scenario_count === 10 ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <><Play className="mr-1.5 h-3.5 w-3.5" />Run 10</>
-              )}
+            <Button onClick={() => start(10)} disabled={!!running || !systemPrompt.trim()} variant="outline" size="sm" className="min-w-0 flex-1 rounded-lg sm:flex-none">
+              {running && evalRow?.scenario_count === 10 ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Play className="mr-1.5 h-3.5 w-3.5" />}Run 10
             </Button>
-            <Button onClick={() => start(50)} disabled={!!running} size="sm" className="rounded-lg">
-              {running && evalRow?.scenario_count === 50 ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <><Play className="mr-1.5 h-3.5 w-3.5" />Run 50</>
-              )}
+            <Button onClick={() => start(50)} disabled={!!running || !systemPrompt.trim()} size="sm" className="min-w-0 flex-1 rounded-lg sm:flex-none">
+              {running && evalRow?.scenario_count === 50 ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Play className="mr-1.5 h-3.5 w-3.5" />}Run 50
             </Button>
           </div>
         </CardHeader>
-        <div className="border-t px-6 py-4">
+        <div className="border-b border-border bg-muted/20 px-4 py-3 sm:px-6">
+          <p className="text-xs leading-5 text-muted-foreground">
+            {model.startsWith("ollama/")
+              ? "Local inference selected. Calls use the Ollama service configured for this PromptLab server and do not incur per-token model API fees. Larger runs may take longer."
+              : "Hosted inference selected. Scenario generation, simulated turns, and judging may consume AI gateway/provider credits. Start with 5 scenarios before choosing a larger run."}
+          </p>
+        </div>
+        {startError && <div role="alert" className="mx-4 mt-4 flex items-start gap-2 rounded-lg border border-destructive/25 bg-destructive/5 p-3 text-xs leading-5 text-destructive sm:mx-6"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{startError}</div>}
+        <div className="px-4 py-4 sm:px-6">
           <div className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
             <ShieldCheck className="h-3.5 w-3.5" /> Test suite
           </div>

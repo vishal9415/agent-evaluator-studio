@@ -83,7 +83,7 @@ export function LocalVoiceTest() {
       if (result.reachable && allowed.length === 0) {
         setError("Ollama is running, but neither supported model is installed. In Terminal, run: ollama pull llama3.2:3b");
       } else if (!result.reachable) {
-        setError("PromptLab could not reach Ollama at 127.0.0.1:11434. Open Ollama and verify the command ollama list works in Terminal.");
+        setError("Ollama is not reachable from the PromptLab server at 127.0.0.1:11434. This works by default in local development when PromptLab and Ollama run on the same machine. A hosted deployment needs a trusted, privately reachable OLLAMA_BASE_URL; do not expose Ollama directly to the public internet.");
       } else {
         setError("");
       }
@@ -270,14 +270,14 @@ export function LocalVoiceTest() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Server className="h-5 w-5" /> Local voice mode · Ollama</CardTitle>
           <CardDescription>
-            A no-paid-model-API path inside Voice Reliability Lab: browser speech recognition → local Ollama model → browser/system speech output. It uses a different pipeline from OpenAI Realtime and its results should be measured separately.
+            A no-paid-model-API path inside Voice Reliability Lab: browser speech recognition → an Ollama model reachable by the PromptLab server → browser/system speech output. It uses a different pipeline from OpenAI Realtime and its results should be measured separately. The default endpoint works when PromptLab and Ollama run on the same machine, such as local development.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
             <p className="flex items-center gap-2 font-medium"><AlertTriangle className="h-4 w-4" /> Local model, browser-managed speech</p>
             <p className="mt-1 text-muted-foreground">
-              PromptLab sends text to Ollama on the computer running this app. Microphone transcription uses your browser's speech-recognition service, which may process audio online; do not assume it is fully offline. Speech output uses browser/system voices. PromptLab does not save this local-mode transcript or its event timeline to session history.
+              PromptLab sends text to the Ollama endpoint configured for its server. A hosted PromptLab deployment will not automatically connect to Ollama on your personal Mac. Microphone transcription uses your browser's speech-recognition service, which may process audio online; do not assume the voice path is fully offline. Speech output uses browser/system voices. Local-mode transcripts and events are not saved to session history.
             </p>
           </div>
 

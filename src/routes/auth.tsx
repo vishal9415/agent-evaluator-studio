@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, AudioLines, CheckCircle2, Eye, EyeOff, ShieldCheck, Sparkles } from "lucide-react";
@@ -6,14 +6,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Toaster } from "@/components/ui/sonner";
+
+type AuthMode = "signin" | "signup" | "forgot" | "reset";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Sign in — PromptLab" },
-      { name: "description", content: "Sign in or create an account to test and improve your conversational AI agents." },
-      { property: "og:title", content: "Sign in — PromptLab" },
+      { title: "Account access — PromptLab" },
+      { name: "description", content: "Sign in, create an account, or recover your password to access PromptLab." },
+      { property: "og:title", content: "Account access — PromptLab" },
       { property: "og:description", content: "Access the PromptLab evaluation studio and guardrails library." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -24,20 +25,32 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<AuthMode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [confirmationMessage, setConfirmationMessage] = useState("");
+  const recoveryInProgress = useRef(false);
 
   useEffect(() => {
     let alive = true;
+    const isRecoveryRedirect = typeof window !== "undefined" && window.location.hash.includes("type=recovery");
+    recoveryInProgress.current = isRecoveryRedirect;
+    if (isRecoveryRedirect) setMode("reset");
+
     void supabase.auth.getSession().then(({ data }) => {
-      if (alive && data.session) void navigate({ to: "/playground" });
+      if (alive && data.session && !recoveryInProgress.current) void navigate({ to: "/playground" });
     });
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (alive && session) void navigate({ to: "/playground" });
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!alive) return;
+      if (event === "PASSWORD_RECOVERY") {
+        recoveryInProgress.current = true;
+        setMode("reset");
+        setConfirmationMessage("");
+        return;
+      }
+      if (session && !recoveryInProgress.current) void navigate({ to: "/playground" });
     });
     return () => {
       alive = false;
@@ -52,6 +65,26 @@ function AuthPage() {
     setConfirmationMessage("");
 
     try {
+      if (mode === "forgot") {
+        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: window.location.origin + "/auth",
+        });
+        if (error) throw error;
+        setConfirmationMessage("If an account exists for this address, a password reset link will arrive by email. Open it on this device to set a new password.");
+        toast.success("Password reset email requested");
+        return;
+      }
+
+      if (mode === "reset") {
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) throw error;
+        recoveryInProgress.current = false;
+        setPassword("");
+        toast.success("Password updated successfully");
+        await navigate({ to: "/playground" });
+        return;
+      }
+
       const result =
         mode === "signin"
           ? await supabase.auth.signInWithPassword({ email: email.trim(), password })
@@ -91,9 +124,36 @@ function AuthPage() {
     setConfirmationMessage("");
   };
 
+  const beginPasswordRecovery = () => {
+    setMode("forgot");
+    setPassword("");
+    setShowPassword(false);
+    setConfirmationMessage("");
+  };
+
+  const returnToSignIn = () => {
+    recoveryInProgress.current = false;
+    setMode("signin");
+    setPassword("");
+    setShowPassword(false);
+    setConfirmationMessage("");
+  };
+
+  const title = {
+    signin: "Sign in to PromptLab",
+    signup: "Start testing your agents",
+    forgot: "Reset your password",
+    reset: "Choose a new password",
+  }[mode];
+  const description = {
+    signin: "Pick up where you left off in your evaluation studio.",
+    signup: "Create an account to evaluate prompts, explore guardrails, and review results.",
+    forgot: "Enter your account email and we’ll send a password reset link if it matches an account.",
+    reset: "Choose a new password for your PromptLab account.",
+  }[mode];
+
   return (
     <div className="min-h-screen bg-background lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.82fr)]">
-      <Toaster />
       <aside className="relative hidden min-h-screen overflow-hidden bg-[#0b1311] p-10 text-white lg:flex lg:flex-col lg:justify-between xl:p-14">
         <div className="pointer-events-none absolute -right-24 top-16 h-96 w-96 rounded-full bg-emerald-300/10 blur-[100px]" aria-hidden="true" />
         <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-teal-400/10 blur-[90px]" aria-hidden="true" />
@@ -112,7 +172,7 @@ function AuthPage() {
               ["Pressure-test", "Probe edge cases, prompt injection, and knowledge boundaries."],
               ["Compare", "Review prompt changes against the same scenarios."],
               ["Learn", "Turn failures into a more useful next iteration."],
-            ].map(([title, description]) => <div key={title} className="flex gap-3"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" /><div><p className="text-sm font-medium text-white">{title}</p><p className="mt-1 text-sm leading-5 text-white/45">{description}</p></div></div>)}
+            ].map(([itemTitle, itemDescription]) => <div key={itemTitle} className="flex gap-3"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" /><div><p className="text-sm font-medium text-white">{itemTitle}</p><p className="mt-1 text-sm leading-5 text-white/45">{itemDescription}</p></div></div>)}
           </div>
         </div>
 
@@ -132,32 +192,44 @@ function AuthPage() {
         <div className="flex flex-1 items-center justify-center px-5 pb-12 pt-4 sm:px-8 lg:px-10 lg:pb-16">
           <div className="w-full max-w-md">
             <div className="mb-8">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">{mode === "signin" ? "Welcome back" : "Create your workspace access"}</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{mode === "signin" ? "Sign in to PromptLab" : "Start testing your agents"}</h2>
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">{mode === "signin" ? "Pick up where you left off in your evaluation studio." : "Create an account to evaluate prompts, explore guardrails, and review results."}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">{mode === "signin" ? "Welcome back" : mode === "signup" ? "Create your workspace access" : mode === "forgot" ? "Account recovery" : "Secure password update"}</p>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h2>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">{description}</p>
             </div>
 
             {confirmationMessage && <div role="status" className="mb-5 flex gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4 text-sm leading-6"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /><span>{confirmationMessage}</span></div>}
 
             <form onSubmit={submit} className="space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email address</Label>
-                <Input id="email" name="email" type="email" placeholder="you@company.com" autoComplete="email" autoCapitalize="none" spellCheck={false} required maxLength={254} value={email} onChange={(event) => setEmail(event.target.value)} disabled={busy} className="h-11 bg-card" />
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-3"><Label htmlFor="password">Password</Label><span className="text-[11px] text-muted-foreground">{mode === "signup" ? "At least 6 characters" : "Your account password"}</span></div>
-                <div className="relative">
-                  <Input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete={mode === "signin" ? "current-password" : "new-password"} required minLength={6} maxLength={128} value={password} onChange={(event) => setPassword(event.target.value)} disabled={busy} className="h-11 bg-card pr-12" />
-                  <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} disabled={busy} className="absolute inset-y-0 right-0 inline-flex w-11 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
+              {mode !== "reset" && (
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email address</Label>
+                  <Input id="email" name="email" type="email" placeholder="you@company.com" autoComplete="email" autoCapitalize="none" spellCheck={false} required maxLength={254} value={email} onChange={(event) => setEmail(event.target.value)} disabled={busy} className="h-11 bg-card" />
                 </div>
-              </div>
+              )}
+              {mode !== "forgot" && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-3"><Label htmlFor="password">{mode === "reset" ? "New password" : "Password"}</Label><span className="text-[11px] text-muted-foreground">{mode === "signin" ? "Your account password" : "At least 6 characters"}</span></div>
+                  <div className="relative">
+                    <Input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete={mode === "signin" ? "current-password" : "new-password"} required minLength={6} maxLength={128} value={password} onChange={(event) => setPassword(event.target.value)} disabled={busy} className="h-11 bg-card pr-12" />
+                    <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} disabled={busy} className="absolute inset-y-0 right-0 inline-flex w-11 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
+                  </div>
+                </div>
+              )}
+
+              {mode === "signin" && <div className="-mt-2 text-right"><button type="button" onClick={beginPasswordRecovery} disabled={busy} className="text-xs font-medium text-brand underline-offset-4 hover:underline disabled:opacity-50">Forgot password?</button></div>}
 
               <Button type="submit" className="h-11 w-full bg-brand font-semibold text-brand-foreground hover:bg-brand/90" disabled={busy}>
-                {busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}{!busy && <ArrowRight className="ml-2 h-4 w-4" />}
+                {busy ? "Please wait…" : mode === "signin" ? "Sign in" : mode === "signup" ? "Create account" : mode === "forgot" ? "Send reset link" : "Update password"}{!busy && <ArrowRight className="ml-2 h-4 w-4" />}
               </Button>
 
-              <div className="flex items-center gap-3 py-1"><span className="h-px flex-1 bg-border" /><span className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Account access</span><span className="h-px flex-1 bg-border" /></div>
-              <p className="text-center text-sm text-muted-foreground">{mode === "signin" ? "New to PromptLab?" : "Already have an account?"}{" "}<button type="button" className="font-semibold text-foreground underline decoration-brand/60 underline-offset-4 transition-colors hover:decoration-brand disabled:opacity-50" disabled={busy} onClick={switchMode}>{mode === "signin" ? "Create an account" : "Sign in instead"}</button></p>
+              {mode === "signin" || mode === "signup" ? (
+                <>
+                  <div className="flex items-center gap-3 py-1"><span className="h-px flex-1 bg-border" /><span className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Account access</span><span className="h-px flex-1 bg-border" /></div>
+                  <p className="text-center text-sm text-muted-foreground">{mode === "signin" ? "New to PromptLab?" : "Already have an account?"}{" "}<button type="button" className="font-semibold text-foreground underline decoration-brand/60 underline-offset-4 transition-colors hover:decoration-brand disabled:opacity-50" disabled={busy} onClick={switchMode}>{mode === "signin" ? "Create an account" : "Sign in instead"}</button></p>
+                </>
+              ) : (
+                <p className="text-center text-sm text-muted-foreground"><button type="button" className="font-semibold text-foreground underline decoration-brand/60 underline-offset-4 transition-colors hover:decoration-brand disabled:opacity-50" disabled={busy} onClick={returnToSignIn}>Back to sign in</button></p>
+              )}
             </form>
 
             <p className="mt-8 text-center text-xs leading-5 text-muted-foreground">Use a unique password for your account. Don't enter production customer data into the public demo.</p>

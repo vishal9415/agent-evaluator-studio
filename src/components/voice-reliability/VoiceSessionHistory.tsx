@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronDown, ChevronUp, Clock3, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Clock3, Mic2, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -95,17 +95,30 @@ export function VoiceSessionHistory({ refreshToken }: { refreshToken: number }) 
 
   return (
     <Card className="border-border/60 shadow-sm">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-sm"><Clock3 className="h-4 w-4" /> Recent voice sessions</CardTitle>
-        <CardDescription className="text-xs">
-          The history stores session metadata and event timings only. Raw audio and transcript text are not persisted. Delete records whenever you no longer need them; automatic expiry is not configured yet.
-        </CardDescription>
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <CardTitle className="flex items-center gap-2 text-sm"><Clock3 className="h-4 w-4 text-brand" /> Recent voice sessions</CardTitle>
+          <CardDescription className="mt-1.5 max-w-2xl text-xs leading-5">
+            Session metadata and event timings only. Raw audio and transcript text are not persisted. You can delete ended sessions; automatic expiry is not configured yet.
+          </CardDescription>
+        </div>
+        <Button size="sm" variant="outline" onClick={() => void refresh()} disabled={loading} className="shrink-0">
+          <RefreshCw className={`mr-2 h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+        </Button>
       </CardHeader>
       <CardContent className="space-y-3">
         {loading && sessions.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Loading session history…</p>
+          <div role="status" className="space-y-2" aria-label="Loading voice history">
+            <div className="h-16 animate-pulse rounded-xl bg-muted/60" />
+            <div className="h-16 animate-pulse rounded-xl bg-muted/40" />
+            <p className="text-xs text-muted-foreground">Loading session history…</p>
+          </div>
         ) : sessions.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No live voice sessions have been recorded yet.</p>
+          <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-9 text-center">
+            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-muted-foreground"><Mic2 className="h-5 w-5" /></div>
+            <p className="mt-3 text-sm font-medium">No live sessions yet</p>
+            <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-muted-foreground">Start an OpenAI Realtime session to record session metadata and browser-observed event timings. Local voice conversations stay in page memory and are not listed here.</p>
+          </div>
         ) : (
           sessions.map((session) => (
             <div key={session.id} className="rounded-lg border border-border/70">
