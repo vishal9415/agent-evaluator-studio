@@ -77,6 +77,8 @@ PromptLab connects to `http://127.0.0.1:11434/v1` by default. Override this with
 
 The initial local connection uses Ollama's OpenAI-compatible `/v1/chat/completions` endpoint. Tool-calling reliability varies by model; Qwen3 is the recommended first model for automated evaluations. Live audio in Voice Reliability Lab still uses OpenAI Realtime and is a separate, paid provider path.
 
+Voice Reliability Lab includes a **Local Ollama** tab alongside the unchanged **OpenAI Realtime** tab. The local tab uses the selected Ollama model for text generation, the browser's SpeechRecognition API for microphone transcription when supported, and browser/system speech synthesis for spoken replies. Browser speech recognition may process audio online, so this mode should not be described as fully offline. It does not write the local conversation or event timeline to PromptLab voice-session history. Typed text input remains available if browser speech recognition is unsupported. The two modes use different pipelines and their latency figures are not directly comparable.
+
 ### Supabase migrations and local pilot allowance
 
 For a fresh Supabase development project, apply **all migration files** in `supabase/migrations/` in timestamp order. The older migrations create the initial prompts/evaluations/scenarios and profile schema; the later migrations add ownership, prompt versions, voice session history, the usage ledger, and owner-scoped prompt comparisons. Applying only the four newest files to an empty project will fail because they depend on the earlier schema.
