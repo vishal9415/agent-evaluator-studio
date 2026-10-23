@@ -179,6 +179,8 @@ function Playground() {
       setSystemPrompt(DEFAULT_PROMPT);
       setBeginMessage(DEFAULT_BEGIN_MESSAGE);
       setStages([]);
+      setModel(MODELS[0].value);
+      setAgentType("chat");
       setVarsText("lead_name=Priya");
       setSavedSignature(null);
       return;
@@ -235,8 +237,8 @@ function Playground() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2 lg:justify-end">
-              <Button variant="outline" size="sm" onClick={() => { setName("Untitled prompt"); setBeginMessage(DEFAULT_BEGIN_MESSAGE); setSystemPrompt(DEFAULT_PROMPT); setStages([]); setVarsText("lead_name=Priya"); setPromptId(null); setSavedSignature(null); }}><Sparkles className="mr-2 h-3.5 w-3.5" />Reset to sample</Button>
-              <Button size="sm" onClick={savePrompt} disabled={saving || !name.trim() || !systemPrompt.trim()}><Save className="mr-2 h-3.5 w-3.5" />{saving ? "Saving…" : "Save prompt"}</Button>
+              <Button variant="outline" size="sm" onClick={() => { setName("Untitled prompt"); setBeginMessage(DEFAULT_BEGIN_MESSAGE); setSystemPrompt(DEFAULT_PROMPT); setStages([]); setModel(MODELS[0].value); setAgentType("chat"); setVarsText("lead_name=Priya"); setPromptId(null); setSavedSignature(null); }}><Sparkles className="mr-2 h-3.5 w-3.5" />Reset to sample</Button>
+              <Button size="sm" onClick={savePrompt} disabled={saving || !name.trim() || !systemPrompt.trim() || !hasUnsavedChanges}><Save className="mr-2 h-3.5 w-3.5" />{saving ? "Saving…" : "Save prompt"}</Button>
             </div>
           </div>
         </section>
@@ -408,7 +410,7 @@ function Playground() {
               Suggest improvements
             </Button>
 
-            <Button onClick={savePrompt} disabled={saving || !name.trim() || !systemPrompt.trim()} className="h-10 w-full rounded-lg">
+            <Button onClick={savePrompt} disabled={saving || !name.trim() || !systemPrompt.trim() || !hasUnsavedChanges} className="h-10 w-full rounded-lg">
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               {saving ? "Saving…" : promptId ? "Save new version" : "Save prompt"}
             </Button>
