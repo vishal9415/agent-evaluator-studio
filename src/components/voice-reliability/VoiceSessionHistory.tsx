@@ -127,7 +127,14 @@ export function VoiceSessionHistory({ refreshToken }: { refreshToken: number }) 
                     {expanded === session.id ? <ChevronUp className="mr-1.5 h-3.5 w-3.5" /> : <ChevronDown className="mr-1.5 h-3.5 w-3.5" />}
                     Events
                   </Button>
-                  <Button size="icon" variant="ghost" aria-label="Delete voice session history" onClick={() => void deleteSession(session)}>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    aria-label="Delete voice session history"
+                    title={session.ended_at ? "Delete session history" : "End this session before deleting its history"}
+                    disabled={!session.ended_at}
+                    onClick={() => void deleteSession(session)}
+                  >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
