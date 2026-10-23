@@ -171,7 +171,7 @@ export function VoiceUsagePanel({ refreshToken }: { refreshToken: number }) {
           </div>
         )}
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          Session reconciliation uses recorded duration, rounded up to seconds and capped to the reserved allowance. If the browser disappears unexpectedly, the session may require refresh/reconciliation; a server-side watchdog is not included yet.
+          Session reconciliation uses server-recorded duration, rounded up to seconds. If provider hangup cannot be confirmed, the full ten-minute test allowance is conservatively consumed. Usage refresh attempts to recover sessions older than 12 minutes, but there is no scheduled background watchdog. Test-seconds are not OpenAI dollar costs.
         </p>
       </CardContent>
     </Card>
