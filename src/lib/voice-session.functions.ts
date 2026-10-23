@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { getVoiceSessionDeletionBlock } from "@/lib/voice-session-deletion";
 
 async function admin() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -256,15 +257,43 @@ export const deleteVoiceSession = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ sessionId: sessionIdSchema }).parse(input))
   .handler(async ({ data, context }) => {
     const db = await admin();
+    const { data: session, error: sessionError } = await db
+      .from("voice_sessions")
+      .select("id, ended_at")
+      .eq("id", data.sessionId)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+
+    if (sessionError || !session) throw new Error("Voice session not found.");
+
+    // The ledger reservation is separate from the session row. Never delete
+    // a live session or cascade-delete a reservation whose usage is unsettled.
+    const { data: reservation, error: reservationError } = await db
+      .from("voice_usage_reservations")
+      .select("status")
+      .eq("session_id", data.sessionId)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (reservationError) throw new Error("Could not verify voice session usage.");
+
+    const deletionBlock = getVoiceSessionDeletionBlock({
+      endedAt: session.ended_at,
+      reservationStatus: reservation?.status ?? null,
+    });
+    if (deletionBlock) throw new Error(deletionBlock);
+
     const { data: deleted, error } = await db
       .from("voice_sessions")
       .delete()
       .eq("id", data.sessionId)
       .eq("user_id", context.userId)
+      .not("ended_at", "is", null)
       .select("id")
       .maybeSingle();
     if (error) throw new Error("Could not delete the voice session.");
-    if (!deleted) throw new Error("Voice session not found.");
+    if (!deleted) {
+      throw new Error("The session changed while deleting. Refresh history and retry.");
+    }
     return { deleted: true };
   });
 
