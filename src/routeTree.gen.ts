@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedGuardrailsRouteImport } from './routes/_authenticated/guardrails'
 import { Route as AuthenticatedPlaygroundRouteImport } from './routes/_authenticated/playground'
+import { Route as AuthenticatedVoiceReliabilityRouteImport } from './routes/_authenticated/voice-reliability'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -39,18 +40,25 @@ const AuthenticatedPlaygroundRoute = AuthenticatedPlaygroundRouteImport.update({
   path: '/playground',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedVoiceReliabilityRoute = AuthenticatedVoiceReliabilityRouteImport.update({
+  id: '/_authenticated/voice-reliability',
+  path: '/voice-reliability',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/guardrails': typeof AuthenticatedGuardrailsRoute
   '/playground': typeof AuthenticatedPlaygroundRoute
+  '/voice-reliability': typeof AuthenticatedVoiceReliabilityRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/guardrails': typeof AuthenticatedGuardrailsRoute
   '/playground': typeof AuthenticatedPlaygroundRoute
+  '/voice-reliability': typeof AuthenticatedVoiceReliabilityRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -59,12 +67,13 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/guardrails': typeof AuthenticatedGuardrailsRoute
   '/_authenticated/playground': typeof AuthenticatedPlaygroundRoute
+  '/_authenticated/voice-reliability': typeof AuthenticatedVoiceReliabilityRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/guardrails' | '/playground'
+  fullPaths: '/' | '/auth' | '/guardrails' | '/playground' | '/voice-reliability'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/guardrails' | '/playground'
+  to: '/' | '/auth' | '/guardrails' | '/playground' | '/voice-reliability'
   id:
     | '__root__'
     | '/'
@@ -72,6 +81,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/guardrails'
     | '/_authenticated/playground'
+    | '/_authenticated/voice-reliability'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -117,17 +127,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPlaygroundRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/voice-reliability': {
+      id: '/_authenticated/voice-reliability'
+      path: '/voice-reliability'
+      fullPath: '/voice-reliability'
+      preLoaderRoute: typeof AuthenticatedVoiceReliabilityRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedGuardrailsRoute: typeof AuthenticatedGuardrailsRoute
   AuthenticatedPlaygroundRoute: typeof AuthenticatedPlaygroundRoute
+  AuthenticatedVoiceReliabilityRoute: typeof AuthenticatedVoiceReliabilityRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedGuardrailsRoute: AuthenticatedGuardrailsRoute,
   AuthenticatedPlaygroundRoute: AuthenticatedPlaygroundRoute,
+  AuthenticatedVoiceReliabilityRoute: AuthenticatedVoiceReliabilityRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

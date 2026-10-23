@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { callGateway } from "./playground.functions";
 import { GUARDRAILS } from "./guardrails-data";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const inputSchema = z.object({
   useCase: z.string().trim().min(20).max(4000),
@@ -38,6 +39,7 @@ BANNED: "be helpful", "be respectful", "ensure accuracy", "as appropriate", "use
 Return 12–20 guardrails ordered by severity (critical first).`;
 
 export const generateGuardrails = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d) => inputSchema.parse(d))
   .handler(async ({ data }) => {
     const exemplars = GUARDRAILS.filter((g) => EXEMPLAR_IDS.includes(g.id))

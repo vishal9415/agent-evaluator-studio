@@ -10,7 +10,7 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { chatCompletion, synthesizeSpeech } from "@/lib/playground.functions";
+import { chatCompletion, publicDemoChatCompletion, synthesizeSpeech } from "@/lib/playground.functions";
 import { fillVariables, transitionToolName, type Stage } from "@/lib/playground-constants";
 import { CallHistory } from "@/components/playground/CallHistory";
 import { useCallHistory } from "@/lib/call-history";
@@ -31,6 +31,8 @@ interface Props {
   showHistory?: boolean;
   /** Clickable sample questions shown before the first message. */
   suggestions?: string[];
+  /** Use the fixed, rate-limited anonymous demo endpoint instead of authenticated playground calls. */
+  publicDemo?: boolean;
 }
 
 
@@ -80,6 +82,7 @@ export function ManualChat({
   variables = {},
   showHistory = true,
   suggestions = [],
+  publicDemo = false,
 }: Props) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [stageId, setStageId] = useState<string | null>(stages[0]?.id ?? null);
@@ -116,6 +119,7 @@ export function ManualChat({
   const [ttsFallback, setTtsFallback] = useState(false);
 
   const chat = useServerFn(chatCompletion);
+  const publicDemoChat = useServerFn(publicDemoChatCompletion);
   const tts = useServerFn(synthesizeSpeech);
   const endRef = useRef<HTMLDivElement>(null);
   const recRef = useRef<any>(null);
@@ -371,9 +375,11 @@ export function ManualChat({
   const send = async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || loading) return;
-    // A typed message outside a voice call still belongs to a logged session.
-    ensureCall(listening ? "voice" : "chat");
-    log("user", trimmed);
+    // The anonymous public demo does not persist messages or create call-history rows.
+    if (!publicDemo) {
+      ensureCall(listening ? "voice" : "chat");
+      log("user", trimmed);
+    }
     const next: Msg[] = [...messages, { role: "user", content: trimmed }];
     setMessages(next);
     setInput("");
@@ -382,9 +388,11 @@ export function ManualChat({
     try {
       const filledSystem = fillVariables(systemPrompt, variables);
       let activeStage = stageId;
-      let res = await chat({
-        data: { model, systemPrompt: filledSystem, messages: next, ...stagePayload(activeStage) },
-      });
+      let res = publicDemo
+        ? await publicDemoChat({ data: { messages: next } })
+        : await chat({
+            data: { model, systemPrompt: filledSystem, messages: next, ...stagePayload(activeStage) },
+          });
       const history: Msg[] = [...next];
 
       if (res.moveTo) {
@@ -395,7 +403,9 @@ export function ManualChat({
           role: "assistant",
           content: `→ Moved to stage "${res.moveTo.name}"${res.moveTo.reason ? `: ${res.moveTo.reason}` : ""}`,
         });
-        log("stage", `Moved to "${res.moveTo.name}"${res.moveTo.reason ? `: ${res.moveTo.reason}` : ""}`);
+        if (!publicDemo) {
+          log("stage", `Moved to "${res.moveTo.name}"${res.moveTo.reason ? `: ${res.moveTo.reason}` : ""}`);
+        }
         setMessages(history);
         if (!res.content) {
           res = await chat({
@@ -411,7 +421,7 @@ export function ManualChat({
 
       const reply = res.content || "(empty response)";
       setMessages([...history, { role: "assistant", content: reply }]);
-      log("agent", reply);
+      if (!publicDemo) log("agent", reply);
       if (!voice || (sessionRef.current && callIdRef.current === callAtSend)) void speak(reply);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Chat failed");
@@ -588,6 +598,7 @@ export function ManualChat({
           )}
         </div>
         <div className="flex items-center gap-2">
+{!publicDemo && (
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="ghost" size="sm" title="Voice & VAD settings">
@@ -706,6 +717,8 @@ export function ManualChat({
               </div>
             </PopoverContent>
           </Popover>
+          )}
+{!publicDemo && (
           <Button
             variant="ghost"
             size="sm"
@@ -714,6 +727,7 @@ export function ManualChat({
           >
             {speakOutput ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
           </Button>
+          )}
           <Button variant="ghost" size="sm" onClick={() => setMessages([])}>
             Clear
           </Button>

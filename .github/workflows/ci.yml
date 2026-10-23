@@ -1,0 +1,54 @@
+name: PromptLab checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: promptlab-mvp-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_PROJECT_ID: local-build-placeholder
+      SUPABASE_URL: https://example.supabase.co
+      SUPABASE_PUBLISHABLE_KEY: local-build-placeholder
+      VITE_SUPABASE_PROJECT_ID: local-build-placeholder
+      VITE_SUPABASE_URL: https://example.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: local-build-placeholder
+      SUPABASE_SERVICE_ROLE_KEY: local-build-placeholder
+      LOVABLE_API_KEY: local-build-placeholder
+      OPENAI_API_KEY: local-build-placeholder
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: TypeScript check
+        run: bun run typecheck
+      - name: Unit tests
+        run: bun run test
+      # The existing repository has thousands of pre-existing Prettier
+      # violations. Keep this MVP PR focused by running semantic lint on the
+      # new/modified voice files, excluding only the formatting rule.
+      - name: Lint MVP voice files
+        run: >-
+          bunx eslint
+          --rule 'prettier/prettier: off'
+          src/components/voice-reliability/LiveRealtimeTest.tsx
+          src/lib/voice-adapters
+          src/lib/public-demo.server.ts
+          src/routes/_authenticated/voice-reliability.tsx
+          src/routes/_authenticated/route.tsx
+      - name: Production build
+        run: bun run build

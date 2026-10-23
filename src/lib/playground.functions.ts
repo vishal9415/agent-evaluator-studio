@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { DEFAULT_PROMPT } from "@/lib/playground-constants";
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
@@ -62,6 +64,7 @@ export async function callGateway(body: Record<string, unknown>, attempt = 0): P
 
 /** Chat completion for the manual chat playground (stage-aware). */
 export const chatCompletion = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((data) =>
     z
       .object({
@@ -138,6 +141,37 @@ export const chatCompletion = createServerFn({ method: "POST" })
       content,
       moveTo: match ? { id: match.targetId, name: match.targetName, tool: match.tool, reason } : null,
     };
+  });
+
+
+// Anonymous homepage demo with a fixed prompt/model and bounded input.
+export const publicDemoChatCompletion = createServerFn({ method: "POST" })
+  .inputValidator((data) =>
+    z.object({
+      messages: z.array(z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string().min(1).max(1200),
+      })).min(1).max(8),
+    }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { assertPublicDemoQuota } = await import("@/lib/public-demo.server");
+    assertPublicDemoQuota();
+    const messages = data.messages.slice(-8);
+    if (messages[messages.length - 1]?.role !== "user") {
+      throw new Error("The demo expects a new user message.");
+    }
+    const json = await callGateway({
+      model: "google/gemini-2.5-flash-lite",
+      temperature: 0.3,
+      max_tokens: 300,
+      messages: [
+        { role: "system", content: DEFAULT_PROMPT },
+        ...messages,
+      ],
+    });
+    const content = String(json?.choices?.[0]?.message?.content ?? "").slice(0, 2400);
+    return { content, moveTo: null };
   });
 
 /** Generate N scenarios for the given prompt + agent type. */
@@ -330,6 +364,7 @@ ${convo
 
 /** Kick off an evaluation: generates scenarios, runs them, scores them, returns full summary. */
 export const runEvaluation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((data) =>
     z
       .object({
@@ -342,14 +377,48 @@ export const runEvaluation = createServerFn({ method: "POST" })
       })
       .parse(data),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let promptVersionId: string | null = null;
+    if (data.promptId) {
+      const { data: ownedPrompt, error: promptError } = await supabaseAdmin
+        .from("prompts")
+        .select("id")
+        .eq("id", data.promptId)
+        .eq("user_id", context.userId)
+        .maybeSingle();
+      if (promptError || !ownedPrompt) throw new Error("Prompt not found in your account.");
+
+      const { data: versions, error: versionError } = await supabaseAdmin
+        .from("prompt_versions")
+        .select("id, snapshot")
+        .eq("prompt_id", data.promptId)
+        .eq("user_id", context.userId)
+        .order("version_number", { ascending: false })
+        .limit(1);
+      if (versionError) throw new Error("Could not resolve the saved prompt version.");
+      const latest = versions?.[0];
+      const snapshot = latest?.snapshot as { system_prompt?: string; model?: string; agent_type?: string } | undefined;
+      // Link only when the tested configuration matches the saved snapshot.
+      // Unsaved edits still run, but are represented by the immutable prompt_snapshot.
+      if (
+        latest &&
+        snapshot?.system_prompt === data.systemPrompt &&
+        snapshot?.model === data.model &&
+        snapshot?.agent_type === data.agentType
+      ) {
+        promptVersionId = latest.id;
+      }
+    }
 
     // 1. Create evaluation row
     const { data: evalRow, error: evalErr } = await supabaseAdmin
       .from("evaluations")
       .insert({
+        user_id: context.userId,
         prompt_id: data.promptId ?? null,
+        prompt_version_id: promptVersionId,
         prompt_snapshot: data.systemPrompt,
         model: data.model,
         agent_type: data.agentType,
@@ -558,6 +627,7 @@ ${failedSample || "(none)"}
 
 /** ElevenLabs TTS — natural human-like voice. */
 export const synthesizeSpeech = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((data) =>
     z
       .object({
@@ -659,6 +729,7 @@ function promptSnapshot(d: z.infer<typeof coachSectionsSchema>) {
 
 /** Infer the objective from the prompts, then give section-by-section suggestions. */
 export const coachSuggest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((data) => coachSectionsSchema.parse(data))
   .handler(async ({ data }) => {
     const tools = [
