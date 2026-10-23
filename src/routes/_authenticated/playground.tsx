@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Activity, ArrowRight, CheckCircle2, Cpu, Lightbulb, Loader2, Save, Sparkles, WandSparkles } from "lucide-react";
+import { Activity, CheckCircle2, Cpu, Lightbulb, Loader2, Save, Sparkles, WandSparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
