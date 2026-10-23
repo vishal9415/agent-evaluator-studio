@@ -55,12 +55,22 @@ The Voice Reliability Lab connects to OpenAI Realtime through server-side SDP ne
 
 ### Supabase migrations and local pilot allowance
 
-Before running the live Voice Reliability Lab against your project, apply the new migrations in timestamp order using your normal reviewed Supabase migration workflow:
+For a fresh Supabase development project, apply **all migration files** in `supabase/migrations/` in timestamp order. The older migrations create the initial prompts/evaluations/scenarios and profile schema; the later migrations add ownership, prompt versions, voice session history, the usage ledger, and owner-scoped prompt comparisons. Applying only the four newest files to an empty project will fail because they depend on the earlier schema.
 
-- `20261023110000_scope_evaluations_to_user.sql`
-- `20261023120000_prompt_versions.sql`
-- `20261023130000_voice_session_history.sql`
-- `20261023140000_voice_test_usage_ledger.sql`
+Recommended CLI workflow from the repository root:
+
+```sh
+supabase login
+supabase link --project-ref YOUR_DEV_PROJECT_REF
+supabase migration list
+supabase db push --dry-run
+# Confirm the linked ref is your development project and review the pending migrations.
+supabase db push
+```
+
+Do not run `supabase db reset` against a remote project. Keep schema changes in versioned migration files and do not paste database passwords or server-only keys into chat or source control.
+
+The authenticated user must have enough internal pilot test-seconds available before a call starts. Set `PROMPTLAB_ADMIN_USER_IDS` to a comma-separated allowlist of trusted Supabase Auth user UUIDs, restart the dev server, sign in with an allowlisted account, and use the Pilot usage allowance panel to grant a small test allowance to the intended user's Auth UUID. Keep this allowlist server-side only. New voice sessions reserve up to ten minutes before provider negotiation; the session is reconciled when it ends. If provider hangup cannot be confirmed, the full ten-minute allowance is conservatively consumed. These units are a hard operational cap in seconds, not dollars or provider cost. OpenAI usage is billed separately by OpenAI.
 
 The authenticated user must have enough internal pilot test-seconds available before a call starts. Set `PROMPTLAB_ADMIN_USER_IDS` to a comma-separated allowlist of trusted Supabase Auth user UUIDs, restart the dev server, sign in with an allowlisted account, and use the Pilot usage allowance panel to grant a small test allowance to the intended user's Auth UUID. Keep this allowlist server-side only. New voice sessions reserve up to ten minutes before provider negotiation; the session is reconciled when it ends. If provider hangup cannot be confirmed, the full ten-minute allowance is conservatively consumed. These units are a hard operational cap in seconds, not dollars or provider cost. OpenAI usage is billed separately by OpenAI.
 
