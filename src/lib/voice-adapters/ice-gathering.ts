@@ -17,11 +17,9 @@ export async function waitForIceGatheringComplete(
 
   await new Promise<void>((resolve, reject) => {
     let settled = false;
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-
     const cleanup = () => {
       peer.removeEventListener("icegatheringstatechange", onStateChange);
-      if (timeoutId !== undefined) clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
     };
     const onStateChange: EventListener = () => {
       if (peer.iceGatheringState !== "complete" || settled) return;
@@ -31,7 +29,7 @@ export async function waitForIceGatheringComplete(
     };
 
     peer.addEventListener("icegatheringstatechange", onStateChange);
-    timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       if (settled) return;
       settled = true;
       cleanup();
