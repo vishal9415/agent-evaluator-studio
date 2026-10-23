@@ -3,7 +3,8 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { variantSchema, scenarioSchema, validateComparisonProgress, nextComparisonStamp, type Comparison, type PairResult } from "./prompt-comparison";
 import { getSuite } from "./eval-suites";
-import { generateScenarios, runAndJudgeScenario, callModel, taskModel } from "./playground.functions";
+import { generateScenarios, runAndJudgeScenario, callModel } from "./playground.functions";
+import { taskModel } from "./ollama-models";
 import type { Json } from "@/integrations/supabase/types";
 
 const idSchema = z.object({ id: z.string().uuid() });
