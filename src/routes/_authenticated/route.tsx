@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createFileRoute, Link, Outlet, redirect, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, AudioLines, FlaskConical, LayoutDashboard, LogOut, Menu, Mic2, ShieldCheck, X } from "lucide-react";
+import { ArrowRight, AudioLines, LayoutDashboard, LogOut, Menu, Mic2, ShieldCheck, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
