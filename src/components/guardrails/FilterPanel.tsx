@@ -44,12 +44,12 @@ function Section<T extends string>({
   const [expanded, setExpanded] = useState(defaultExpanded);
 
   return (
-    <section className="border-b border-border/70 py-3 last:border-b-0 last:pb-0">
+    <section className="border-b border-[#e6eee8] py-3 last:border-b-0 last:pb-0">
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
         aria-expanded={expanded}
-        className="flex w-full items-center justify-between gap-3 rounded-md py-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-[#f5f8f6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <span className="flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-wider text-foreground/85">
           {title}
@@ -60,7 +60,7 @@ function Section<T extends string>({
       {expanded && (
         <div className="mt-2 max-h-64 space-y-1 overflow-y-auto pr-1">
           {items.map((item) => (
-            <Label key={item} className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 text-sm font-normal text-foreground transition-colors hover:bg-muted">
+            <Label key={item} className="flex cursor-pointer items-center gap-2.5 rounded-xl px-2 py-2 text-sm font-normal text-foreground transition-colors hover:bg-[#f2f7f3]">
               <Checkbox checked={selected.has(item)} onCheckedChange={() => onToggle(item)} />
               <span className="flex-1 break-words leading-5">{item}</span>
             </Label>
@@ -84,7 +84,7 @@ export function FilterPanel({ filters, setFilters, counts }: Props) {
 
   return (
     <aside className="space-y-3" aria-label="Guardrail filters">
-      <div className="flex items-center justify-between gap-2 rounded-lg bg-muted/50 px-3 py-2.5">
+      <div className="flex items-center justify-between gap-2 rounded-xl bg-[#f5f8f6] px-3 py-3">
         <div className="min-w-0">
           <p className="flex items-center gap-1.5 text-xs font-semibold"><SlidersHorizontal className="h-3.5 w-3.5 text-brand" /> Filter results</p>
           <p className="mt-1 text-[11px] text-muted-foreground">{counts.visible} of {counts.total} results</p>

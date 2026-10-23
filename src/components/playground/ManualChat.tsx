@@ -583,8 +583,8 @@ export function ManualChat({
 
   return (
     <div>
-      <div className="flex h-[600px] flex-col rounded-lg border bg-card">
-      <div className="flex items-center justify-between border-b px-4 py-2">
+      <div className="flex h-[600px] flex-col overflow-hidden rounded-[22px] border border-[#dce8e1] bg-white shadow-[0_12px_40px_-30px_rgba(16,43,37,0.35)]">
+      <div className="flex items-center justify-between border-b border-[#e5eee8] bg-[#f8faf9] px-4 py-3">
         <div className="text-sm text-muted-foreground">
           Manual chat · <span className="font-mono">{model}</span>
           {selectedVoice && speakOutput && (

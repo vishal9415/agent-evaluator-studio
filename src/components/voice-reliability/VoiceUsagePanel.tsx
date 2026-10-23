@@ -104,8 +104,8 @@ export function VoiceUsagePanel({ refreshToken }: { refreshToken: number }) {
   }
 
   return (
-    <Card className="border-border/60 shadow-sm">
-      <CardHeader>
+    <Card className="overflow-hidden rounded-[22px] border-[#e0e9e3] bg-white shadow-[0_12px_40px_-30px_rgba(16,43,37,0.35)]">
+      <CardHeader className="border-b border-[#e5eee8] bg-[#f8faf9] px-5 py-5 sm:px-7">
         <CardTitle className="flex items-center gap-2 text-sm">
           <Coins className="h-4 w-4" />
           Pilot usage allowance
@@ -114,7 +114,7 @@ export function VoiceUsagePanel({ refreshToken }: { refreshToken: number }) {
           Credits are internal test-seconds used to bound PromptLab sessions. They are not dollars or an estimate of provider spend. OpenAI bills your OpenAI account separately.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 px-5 py-5 sm:px-7 sm:py-6">
         <div className="flex justify-end">
           <Button size="sm" variant="ghost" onClick={() => void refresh()} disabled={loading}>
             <RefreshCw className={`mr-2 h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
@@ -128,7 +128,7 @@ export function VoiceUsagePanel({ refreshToken }: { refreshToken: number }) {
             { label: "Used", value: usage ? duration(usage.usedSeconds) : "—" },
             { label: "Granted", value: usage ? duration(usage.grantedSeconds) : "—" },
           ].map((stat) => (
-            <div key={stat.label} className="rounded-lg border border-border/70 p-3">
+            <div key={stat.label} className="rounded-2xl border border-[#e0e9e3] bg-[#f8faf9] p-3.5">
               <p className="text-xs text-muted-foreground">{stat.label}</p>
               <p className="mt-1 text-lg font-semibold tabular-nums">{stat.value}</p>
             </div>
