@@ -59,8 +59,8 @@ export function GuardrailGenerator() {
         <Wand2 className="h-4 w-4 text-primary" />
         <h2 className="text-base font-semibold text-foreground">Generate guardrails for your use case</h2>
       </div>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Describe what your agent does, who it talks to and what it can do. You'll get a tailored set of ready-to-paste guardrails.
+      <p className="mt-1 text-sm leading-6 text-muted-foreground">
+        Describe what your agent does, who it talks to and what it can do. You’ll get tailored, ready-to-paste guardrails. This generator uses your configured hosted AI gateway and may consume AI credits; browsing and copying saved library items does not call the generator.
       </p>
       <div className="mt-4 space-y-2">
         <Label htmlFor="guardrail-use-case" className="text-xs font-semibold">Describe your agent and its boundaries</Label>
