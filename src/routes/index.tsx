@@ -246,7 +246,7 @@ function Home() {
               </div>
               <div className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-xs text-white/50">
                 <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-300" /> Try the sample agent without an account</span>
-                <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-300" /> Optional local model support</span>
+                <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-300" /> Local models on self-hosted installs</span>
               </div>
               <div className="mt-10 grid max-w-lg grid-cols-3 border-t border-white/10 pt-5">
                 <div className="pr-3"><p className="text-sm font-semibold text-white">Test</p><p className="mt-1 text-xs leading-relaxed text-white/45">Agent behavior</p></div>
@@ -329,7 +329,7 @@ function Home() {
 
         <section className="border-y border-emerald-300/10 bg-[#0d1513] px-4 py-14 text-white sm:px-6 sm:py-16 lg:px-8">
           <div className="mx-auto grid max-w-7xl items-center gap-6 lg:grid-cols-[1fr_auto]">
-            <div className="flex items-start gap-4"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-300/10 text-emerald-200"><Zap className="h-5 w-5" /></div><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-200">Flexible model workflow</p><h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Prototype with a model you can run locally.</h2><p className="mt-3 max-w-2xl text-sm leading-6 text-white/60">Use supported Ollama models for local text chat and prompt evaluation on your machine—without per-token API charges for that local inference path.</p><p className="mt-3 max-w-2xl text-xs leading-5 text-white/40">Voice testing is a separate path. Browser speech recognition may use an online service; local mode is not guaranteed to be fully offline.</p></div></div>
+            <div className="flex items-start gap-4"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-300/10 text-emerald-200"><Zap className="h-5 w-5" /></div><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-200">Flexible model workflow</p><h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Keep model inference local when you self-host.</h2><p className="mt-3 max-w-2xl text-sm leading-6 text-white/60">Run PromptLab on a machine that can reach your Ollama service, such as local development or your own self-hosted deployment. Supported local models can handle text chat and prompt evaluation without per-token model API fees.</p><p className="mt-3 max-w-2xl text-xs leading-5 text-white/40">Voice testing is a separate path. Browser speech recognition may use an online service; local mode is not guaranteed to be fully offline.</p></div></div>
             <Button asChild size="lg" className="bg-emerald-300 font-semibold text-[#102019] hover:bg-emerald-200"><Link to="/auth">Try PromptLab <ArrowRight className="ml-1 h-4 w-4" /></Link></Button>
           </div>
         </section>
