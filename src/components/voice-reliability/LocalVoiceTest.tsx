@@ -76,8 +76,8 @@ export function LocalVoiceTest() {
       const result = await checkModels();
       setOllamaReachable(result.reachable);
       const allowed = result.installedModels.filter(
-        (id): id is LocalModel => MODEL_OPTIONS.some((option) => option.value === id),
-      );
+        (id) => MODEL_OPTIONS.some((option) => option.value === id),
+      ) as LocalModel[];
       setInstalledModels(allowed);
       setModel((current) => allowed.includes(current) ? current : (allowed[0] ?? current));
       if (result.reachable && allowed.length === 0) {
