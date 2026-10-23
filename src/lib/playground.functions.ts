@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { getRequestIP } from "@tanstack/react-start/server";
 import { DEFAULT_PROMPT } from "@/lib/playground-constants";
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
@@ -145,47 +144,7 @@ export const chatCompletion = createServerFn({ method: "POST" })
   });
 
 
-// Public landing-page demo: fixed model + server-owned prompt + bounded turn/input sizes.
-// The in-memory limiter is only a local/single-instance brake; use a shared limiter
-// before a multi-instance public deployment.
-const PUBLIC_DEMO_WINDOW_MS = 60 * 60 * 1000;
-const PUBLIC_DEMO_MAX_PER_IP_PER_WINDOW = 12;
-const PUBLIC_DEMO_GLOBAL_WINDOW_MS = 24 * 60 * 60 * 1000;
-const PUBLIC_DEMO_MAX_PER_PROCESS_DAY = 1200;
-const publicDemoByIp = new Map<string, { startedAt: number; count: number }>();
-let publicDemoGlobalStartedAt = Date.now();
-let publicDemoGlobalCount = 0;
-
-function assertPublicDemoQuota() {
-  const now = Date.now();
-  if (now - publicDemoGlobalStartedAt >= PUBLIC_DEMO_GLOBAL_WINDOW_MS) {
-    publicDemoGlobalStartedAt = now;
-    publicDemoGlobalCount = 0;
-  }
-  if (publicDemoGlobalCount >= PUBLIC_DEMO_MAX_PER_PROCESS_DAY) {
-    throw new Error("The public demo has reached its usage limit. Please sign in to use the full Playground.");
-  }
-
-  // Trust forwarded-IP data only when the deployment proxy overwrites it.
-  const ip = getRequestIP({ xForwardedFor: true }) ?? "unknown";
-  let bucket = publicDemoByIp.get(ip);
-  if (!bucket || now - bucket.startedAt >= PUBLIC_DEMO_WINDOW_MS) {
-    bucket = { startedAt: now, count: 0 };
-    publicDemoByIp.set(ip, bucket);
-  }
-  if (bucket.count >= PUBLIC_DEMO_MAX_PER_IP_PER_WINDOW) {
-    throw new Error("This public demo is rate-limited. Please try again later or sign in to the Playground.");
-  }
-
-  bucket.count += 1;
-  publicDemoGlobalCount += 1;
-  if (publicDemoByIp.size > 2000) {
-    for (const [key, value] of publicDemoByIp.entries()) {
-      if (now - value.startedAt >= PUBLIC_DEMO_WINDOW_MS) publicDemoByIp.delete(key);
-    }
-  }
-}
-
+// Anonymous homepage demo with a fixed prompt/model and bounded input.
 export const publicDemoChatCompletion = createServerFn({ method: "POST" })
   .inputValidator((data) =>
     z.object({
@@ -196,6 +155,7 @@ export const publicDemoChatCompletion = createServerFn({ method: "POST" })
     }).parse(data),
   )
   .handler(async ({ data }) => {
+    const { assertPublicDemoQuota } = await import("@/lib/public-demo.server");
     assertPublicDemoQuota();
     const messages = data.messages.slice(-8);
     if (messages[messages.length - 1]?.role !== "user") {
