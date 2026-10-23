@@ -43,6 +43,7 @@ jobs:
           --rule 'prettier/prettier: off'
           src/components/voice-reliability/LiveRealtimeTest.tsx
           src/lib/voice-adapters
+          src/lib/public-demo.server.ts
           src/routes/_authenticated/voice-reliability.tsx
           src/routes/_authenticated/route.tsx
       - name: Production build
