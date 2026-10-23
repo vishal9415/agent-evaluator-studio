@@ -375,9 +375,11 @@ export function ManualChat({
   const send = async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || loading) return;
-    // A typed message outside a voice call still belongs to a logged session.
-    ensureCall(listening ? "voice" : "chat");
-    log("user", trimmed);
+    // The anonymous public demo does not persist messages or create call-history rows.
+    if (!publicDemo) {
+      ensureCall(listening ? "voice" : "chat");
+      log("user", trimmed);
+    }
     const next: Msg[] = [...messages, { role: "user", content: trimmed }];
     setMessages(next);
     setInput("");
@@ -401,7 +403,9 @@ export function ManualChat({
           role: "assistant",
           content: `→ Moved to stage "${res.moveTo.name}"${res.moveTo.reason ? `: ${res.moveTo.reason}` : ""}`,
         });
-        log("stage", `Moved to "${res.moveTo.name}"${res.moveTo.reason ? `: ${res.moveTo.reason}` : ""}`);
+        if (!publicDemo) {
+          log("stage", `Moved to "${res.moveTo.name}"${res.moveTo.reason ? `: ${res.moveTo.reason}` : ""}`);
+        }
         setMessages(history);
         if (!res.content) {
           res = await chat({
@@ -417,7 +421,7 @@ export function ManualChat({
 
       const reply = res.content || "(empty response)";
       setMessages([...history, { role: "assistant", content: reply }]);
-      log("agent", reply);
+      if (!publicDemo) log("agent", reply);
       if (!voice || (sessionRef.current && callIdRef.current === callAtSend)) void speak(reply);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Chat failed");
