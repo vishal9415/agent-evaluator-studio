@@ -320,7 +320,6 @@ export function LocalVoiceTest() {
             {lastLatencyMs !== null && <span className="text-sm text-muted-foreground">Local model round trip: <strong className="text-foreground tabular-nums">{lastLatencyMs} ms</strong></span>}
           </div>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-          {!("speechSynthesis" in window) && <p className="text-sm text-muted-foreground">This browser does not support speech playback. Text responses remain available.</p>}
         </CardContent>
       </Card>
 
