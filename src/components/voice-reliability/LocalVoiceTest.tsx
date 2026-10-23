@@ -266,15 +266,15 @@ export function LocalVoiceTest() {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
+      <Card className="overflow-hidden rounded-[22px] border-[#e0e9e3] bg-white shadow-[0_12px_40px_-30px_rgba(16,43,37,0.35)]">
+        <CardHeader className="border-b border-[#e5eee8] bg-[#f8faf9] px-5 py-5 sm:px-7">
           <CardTitle className="flex items-center gap-2"><Server className="h-5 w-5" /> Local voice mode · Ollama</CardTitle>
           <CardDescription>
             A no-paid-model-API path inside Voice Reliability Lab: browser speech recognition → an Ollama model reachable by the PromptLab server → browser/system speech output. It uses a different pipeline from OpenAI Realtime and its results should be measured separately. The default endpoint works when PromptLab and Ollama run on the same machine, such as local development.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+        <CardContent className="space-y-5 px-5 py-5 sm:px-7 sm:py-6">
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-950">
             <p className="flex items-center gap-2 font-medium"><AlertTriangle className="h-4 w-4" /> Local model, browser-managed speech</p>
             <p className="mt-1 text-muted-foreground">
               PromptLab sends text to the Ollama endpoint configured for its server. A hosted PromptLab deployment will not automatically connect to Ollama on your personal Mac. Microphone transcription uses your browser's speech-recognition service, which may process audio online; do not assume the voice path is fully offline. Speech output uses browser/system voices. Local-mode transcripts and events are not saved to session history.
@@ -284,7 +284,7 @@ export function LocalVoiceTest() {
           <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
             <label className="space-y-1.5 text-sm font-medium">Local model
               <select
-                className="h-10 w-full rounded-md border border-input bg-background px-3 font-normal"
+                className="h-11 w-full rounded-xl border-[#dce8e1] bg-white px-3 font-normal focus-visible:ring-[#83bda0]"
                 value={model}
                 onChange={(event) => setModel(event.target.value as LocalModel)}
                 disabled={voiceActive || status === "thinking" || status === "speaking"}
@@ -323,7 +323,7 @@ export function LocalVoiceTest() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="overflow-hidden rounded-[22px] border-[#e0e9e3] bg-white shadow-[0_12px_40px_-30px_rgba(16,43,37,0.35)]">
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Volume2 className="h-5 w-5" /> Local conversation</CardTitle>
           <CardDescription>Use voice above or type a message below. Conversation remains in page memory until you clear it or leave this page.</CardDescription>
@@ -347,7 +347,7 @@ export function LocalVoiceTest() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="overflow-hidden rounded-[22px] border-[#e0e9e3] bg-white shadow-[0_12px_40px_-30px_rgba(16,43,37,0.35)]">
         <CardHeader>
           <CardTitle>Local-mode event timeline</CardTitle>
           <CardDescription>In-memory browser observations only. These do not measure carrier latency or match OpenAI provider event semantics.</CardDescription>
