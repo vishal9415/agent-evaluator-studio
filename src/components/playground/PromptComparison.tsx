@@ -102,7 +102,7 @@ export function PromptComparison({ systemPrompt, model, agentType, hasStages, on
     {hasStages && <p className="text-xs text-muted-foreground">System-prompt comparison only. Begin messages, stage transitions and voice timing are not evaluated.</p>}
     {agentType === "voice" && <p className="text-xs text-muted-foreground">Voice scenarios are evaluated as transcripts, not audio or interruption latency.</p>}
     <div className="grid gap-3 sm:grid-cols-[1fr_110px]">
-      <div className="space-y-1.5"><Label className="text-xs">Benchmark suite</Label><Select value={suite} onValueChange={(s) => setSuite(s as SuiteId)} disabled={busy}><SelectTrigger className="w-full min-w-0 text-xs"><SelectValue /></SelectTrigger><SelectContent>{SUITES.map((s) => <SelectItem value={s.id} key={s.id}>{s.label}</SelectItem>)}</SelectContent></Select></div>
+      <div className="space-y-1.5"><Label className="text-xs">Benchmark suite</Label><Select value={suite} onValueChange={(s) => setSuite(s as SuiteId)} disabled={busy}><SelectTrigger className="w-full min-w-0 text-xs"><SelectValue /></SelectTrigger><SelectContent>{SUITES.filter((s) => s.mode !== "fixed").map((s) => <SelectItem value={s.id} key={s.id}>{s.label}</SelectItem>)}</SelectContent></Select></div>
       <div className="space-y-1.5"><Label className="text-xs">Scenario pairs</Label><Select value={String(count)} onValueChange={(s) => setCount(Number(s) as 5 | 10 | 50)} disabled={busy}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{[5, 10, 50].map((n) => <SelectItem key={n} value={String(n)}>{n} pairs</SelectItem>)}</SelectContent></Select></div>
     </div>
     <div className="flex flex-wrap items-center gap-2">

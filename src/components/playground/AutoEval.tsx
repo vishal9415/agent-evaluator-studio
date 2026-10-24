@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { SUITES, DEFAULT_SUITE, type SuiteId } from "@/lib/eval-suites";
 import { exportAuditReport } from "@/lib/audit-report";
+import { REAL_ESTATE_VOICE_BENCHMARK, REAL_ESTATE_VOICE_BENCHMARK_VERSION } from "@/lib/benchmarks/real-estate-voice-v1";
 
 interface Props {
   systemPrompt: string;
@@ -57,6 +58,7 @@ export function AutoEval({ systemPrompt, model, agentType, promptId, onApplyImpr
   const [startError, setStartError] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [suite, setSuite] = useState<SuiteId>(DEFAULT_SUITE);
+  const fullRunCount = suite === "real_estate_voice" ? REAL_ESTATE_VOICE_BENCHMARK.length : 50;
   const run = useServerFn(runEvaluation);
   const fetchEval = useServerFn(getEvaluation);
   const qc = useQueryClient();
@@ -133,6 +135,20 @@ export function AutoEval({ systemPrompt, model, agentType, promptId, onApplyImpr
         improved_prompt?: string;
         passRate?: number;
         enterprise?: Enterprise;
+        benchmark?: {
+          id: string;
+          label: string;
+          version: string;
+          sampleSize: number;
+          packSize: number;
+          deterministicCheckCount: number;
+          deterministicChecksPassed: number;
+          deterministicChecksFailed: number;
+          deterministicPassRate: number;
+          judgeModel: string;
+          methodology: string;
+          limitation: string;
+        };
       }
     | null
     | undefined;
@@ -159,16 +175,20 @@ export function AutoEval({ systemPrompt, model, agentType, promptId, onApplyImpr
             <Button onClick={() => start(10)} disabled={!!running || !systemPrompt.trim()} variant="outline" size="sm" className="min-w-0 flex-1 rounded-lg sm:flex-none">
               {running && evalRow?.scenario_count === 10 ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Play className="mr-1.5 h-3.5 w-3.5" />}Run 10
             </Button>
-            <Button onClick={() => start(50)} disabled={!!running || !systemPrompt.trim()} size="sm" className="min-w-0 flex-1 rounded-lg sm:flex-none">
-              {running && evalRow?.scenario_count === 50 ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Play className="mr-1.5 h-3.5 w-3.5" />}Run 50
+            <Button onClick={() => start(fullRunCount)} disabled={!!running || !systemPrompt.trim()} size="sm" className="min-w-0 flex-1 rounded-lg sm:flex-none">
+              {running && evalRow?.scenario_count === fullRunCount ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Play className="mr-1.5 h-3.5 w-3.5" />}{suite === "real_estate_voice" ? `Run full pack (${fullRunCount})` : "Run 50"}
             </Button>
           </div>
         </CardHeader>
         <div className="border-b border-border bg-muted/20 px-4 py-3 sm:px-6">
           <p className="text-xs leading-5 text-muted-foreground">
-            {model.startsWith("ollama/")
-              ? "Local inference selected. Calls use the Ollama service configured for this PromptLab server and do not incur per-token model API fees. Larger runs may take longer."
-              : "Hosted inference selected. Scenario generation, simulated turns, and judging may consume AI gateway/provider credits. Start with 5 scenarios before choosing a larger run."}
+            {suite === "real_estate_voice"
+              ? model.startsWith("ollama/")
+                ? `Fixed benchmark v${REAL_ESTATE_VOICE_BENCHMARK_VERSION}: target conversations use local Ollama, but cases are scored by a separate hosted Gemini 2.5 Pro judge. Judge calls may consume AI gateway credits.`
+                : `Fixed benchmark v${REAL_ESTATE_VOICE_BENCHMARK_VERSION}: scripted turns are repeatable and rule checks can fail a case. The independent hosted Gemini 2.5 Pro judge may consume AI gateway credits.`
+              : model.startsWith("ollama/")
+                ? "Local inference selected. Calls use the Ollama service configured for this PromptLab server and do not incur per-token model API fees. Larger runs may take longer."
+                : "Hosted inference selected. Scenario generation, simulated turns, and judging may consume AI gateway/provider credits. Start with 5 scenarios before choosing a larger run."}
           </p>
         </div>
         {startError && <div role="alert" className="mx-4 mt-4 flex items-start gap-2 rounded-lg border border-destructive/25 bg-destructive/5 p-3 text-xs leading-5 text-destructive sm:mx-6"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{startError}</div>}
@@ -188,11 +208,24 @@ export function AutoEval({ systemPrompt, model, agentType, promptId, onApplyImpr
                   suite === su.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "hover:bg-muted/50",
                 )}
               >
-                <div className="text-xs font-semibold">{su.label}</div>
-                <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{su.description}</div>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="text-xs font-semibold">{su.label}</div>
+                  {su.mode === "fixed" && <Badge variant="outline" className="shrink-0 text-[9px]">FIXED · v{su.benchmarkVersion}</Badge>}
+                </div>
+                <div className="mt-1 text-[11px] leading-snug text-muted-foreground">{su.description}</div>
               </button>
             ))}
           </div>
+          {suite === "real_estate_voice" && (
+            <div className="mt-3 rounded-xl border border-brand/25 bg-brand/[0.04] p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-semibold">Real-estate voice benchmark · v{REAL_ESTATE_VOICE_BENCHMARK_VERSION}</p>
+                <Badge variant="secondary">{REAL_ESTATE_VOICE_BENCHMARK.length} fixed cases</Badge>
+              </div>
+              <p className="mt-1.5 text-[11px] leading-5 text-muted-foreground">Fixed multi-turn cases cover qualification, pricing and inventory accuracy, return promises, consent, AI identity, human handoff, transcript ambiguity, discounts, bookings, sensitive data, and prompt injection.</p>
+              <p className="mt-1.5 text-[11px] leading-5 text-muted-foreground">Run 5 or 10 to sample the pack, or run all 20 for full-pack coverage. Rule checks are limited heuristics, not certification or acoustic voice measurements.</p>
+            </div>
+          )}
         </div>
         {evalRow && (
           <CardContent className="space-y-4 border-t bg-muted/20 pt-4">
@@ -276,6 +309,29 @@ export function AutoEval({ systemPrompt, model, agentType, promptId, onApplyImpr
 
       {evalRow?.status === "done" && (
         <>
+          {summary?.benchmark && (
+            <Card className="overflow-hidden border-brand/25 shadow-sm">
+              <CardHeader className="pb-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <CardTitle className="text-base">Fixed benchmark evidence</CardTitle>
+                  <Badge variant="outline">v{summary.benchmark.version}</Badge>
+                </div>
+                <p className="text-xs leading-5 text-muted-foreground">{summary.benchmark.label} · {summary.benchmark.sampleSize} of {summary.benchmark.packSize} fixed cases · independent judge: {summary.benchmark.judgeModel}</p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div className="rounded-xl border bg-muted/20 p-3"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Rules run</p><p className="mt-1 text-xl font-semibold tabular-nums">{summary.benchmark.deterministicCheckCount}</p></div>
+                  <div className="rounded-xl border bg-muted/20 p-3"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Rules passed</p><p className="mt-1 text-xl font-semibold tabular-nums text-emerald-600">{summary.benchmark.deterministicChecksPassed}</p></div>
+                  <div className="rounded-xl border bg-muted/20 p-3"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Rules failed</p><p className="mt-1 text-xl font-semibold tabular-nums text-destructive">{summary.benchmark.deterministicChecksFailed}</p></div>
+                  <div className="rounded-xl border bg-muted/20 p-3"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Rule pass rate</p><p className="mt-1 text-xl font-semibold tabular-nums">{summary.benchmark.deterministicPassRate.toFixed(1)}%</p></div>
+                </div>
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.04] p-3">
+                  <p className="text-xs font-semibold">Interpretation note</p>
+                  <p className="mt-1 text-[11px] leading-5 text-muted-foreground">{summary.benchmark.limitation} Review each failed scenario's notes for configured rule evidence.</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <ScoreCard
               label="Effectiveness"
