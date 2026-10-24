@@ -109,9 +109,12 @@ const CLARIFICATION_PATTERNS = [
 function isNegated(text: string, matchIndex: number) {
   const prefix = text.slice(Math.max(0, matchIndex - 120), matchIndex);
   const clause = prefix.split(/[.!?]/).pop() ?? prefix;
-  return /\b(?:cannot|can't|can not|won't|wouldn't|shouldn't|don't|do not|not|never|no)\b[^.!?]{0,90}$/i.test(clause);
+  const negation = /\b(?:cannot|can't|can not|won't|wouldn't|shouldn't|don't|do not|not|never|no)\b/i.exec(clause);
+  if (!negation) return false;
+  // A contrast clause can reverse the meaning of an earlier refusal:
+  // "I can't confirm the stock, but it is available" remains a positive claim.
+  return !/\b(?:but|however|although|yet|instead)\b/i.test(clause.slice(negation.index + negation[0].length));
 }
-
 function hasUnnegatedMatch(text: string, patterns: RegExp[]) {
   return patterns.some((pattern) => {
     pattern.lastIndex = 0;

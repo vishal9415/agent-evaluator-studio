@@ -24,6 +24,7 @@ describe("real-estate voice benchmark v1", () => {
     const scenario = REAL_ESTATE_VOICE_BENCHMARK.find((item) => item.id === "re-inventory-003")!;
     expect(evaluateDeterministicChecks([{ role: "assistant", content: "Yes, the apartment is available right now." }], scenario.checks)[0].passed).toBe(false);
     expect(evaluateDeterministicChecks([{ role: "assistant", content: "I cannot confirm that the apartment is available right now." }], scenario.checks)[0].passed).toBe(true);
+    expect(evaluateDeterministicChecks([{ role: "assistant", content: "I cannot confirm inventory, but the apartment is available right now." }], scenario.checks)[0].passed).toBe(false);
   });
 
   it("detects repeated OTP values without flagging text that omits the value", () => {
