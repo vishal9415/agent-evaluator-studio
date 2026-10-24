@@ -3,6 +3,9 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { DEFAULT_PROMPT } from "@/lib/playground-constants";
 import { isLocalOllamaModel, taskModel } from "@/lib/ollama-models";
+import { evaluateDeterministicChecks, type DeterministicRule } from "@/lib/deterministic-checks";
+import { REAL_ESTATE_VOICE_BENCHMARK, REAL_ESTATE_VOICE_BENCHMARK_VERSION } from "@/lib/benchmarks/real-estate-voice-v1";
+import { computeReadiness, getSuite, promptFingerprint } from "@/lib/eval-suites";
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
@@ -285,6 +288,8 @@ export async function runAndJudgeScenario(
   model: string,
   scenario: { category: string; user_goal: string; expected_behavior: string; opening_message: string },
   fixedUserTurns?: string[],
+  deterministicRules?: DeterministicRule[],
+  judgeModelOverride?: string,
 ) {
   const convo: Msg[] = [
     { role: "system", content: systemPrompt },
@@ -351,7 +356,7 @@ export async function runAndJudgeScenario(
     },
   ];
   const judge = await callModel({
-    model: taskModel(model, "google/gemini-2.5-flash"),
+    model: judgeModelOverride ?? taskModel(model, "google/gemini-2.5-flash"),
     messages: [
       {
         role: "system",
@@ -388,18 +393,33 @@ ${convo
     vulnerability: "Judge error",
   };
   const sev = ["none", "low", "moderate", "high", "critical"].includes(jargs.severity) ? jargs.severity : "moderate";
+  const deterministicChecks = deterministicRules?.length
+    ? evaluateDeterministicChecks(convo.slice(1), deterministicRules)
+    : [];
+  const deterministicFailures = deterministicChecks.filter((check) => !check.passed);
+  const rank: Record<string, number> = { low: 1, medium: 2, moderate: 2, high: 3, critical: 4 };
+  const highestFailure = [...deterministicFailures].sort(
+    (a, b) => (rank[b.severity] ?? 0) - (rank[a.severity] ?? 0),
+  )[0];
+  const checkSeverity = highestFailure?.severity === "medium" ? "moderate" : highestFailure?.severity;
+  const finalSeverity = checkSeverity && (rank[checkSeverity] ?? 0) > (rank[sev] ?? 0) ? checkSeverity : sev;
+  const checkNotes = deterministicChecks.length
+    ? `Rule checks: ${deterministicChecks.filter((check) => check.passed).length}/${deterministicChecks.length} passed.\n` +
+      deterministicChecks.map((check) => `- [${check.passed ? "PASS" : "FAIL"}] ${check.description} — ${check.evidence}`).join("\n")
+    : "";
 
   return {
     conversation: convo.slice(1), // strip system
     effectiveness: Number(jargs.effectiveness) || 0,
     hallucination: Number(jargs.hallucination) || 0,
-    passed: !!jargs.passed,
-    notes: String(jargs.notes || ""),
+    passed: !!jargs.passed && deterministicFailures.length === 0,
+    notes: [String(jargs.notes || ""), checkNotes].filter(Boolean).join("\n\n"),
     safety: Number(jargs.safety) || 0,
     privacy: Number(jargs.privacy) || 0,
     adversarial: Number(jargs.adversarial_resistance) || 0,
-    severity: sev as string,
-    vulnerability: String(jargs.vulnerability || ""),
+    severity: finalSeverity as string,
+    vulnerability: highestFailure?.id ?? String(jargs.vulnerability || ""),
+    deterministicChecks,
   };
 }
 
@@ -414,12 +434,16 @@ export const runEvaluation = createServerFn({ method: "POST" })
         agentType: z.string().min(1).max(40),
         promptId: z.string().uuid().nullable().optional(),
         scenarioCount: z.number().int().min(5).max(50).default(50),
-        suite: z.enum(["balanced", "redteam", "pii", "regulatory", "voice"]).default("balanced"),
+        suite: z.enum(["balanced", "redteam", "pii", "regulatory", "voice", "real_estate_voice"]).default("balanced"),
       })
       .parse(data),
   )
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const suite = getSuite(data.suite);
+    const benchmark = data.suite === "real_estate_voice" ? REAL_ESTATE_VOICE_BENCHMARK : null;
+    const effectiveScenarioCount = benchmark ? Math.min(data.scenarioCount, benchmark.length) : data.scenarioCount;
+    const fixedCases = benchmark ? benchmark.slice(0, effectiveScenarioCount) : null;
 
     let promptVersionId: string | null = null;
     if (data.promptId) {
@@ -464,7 +488,7 @@ export const runEvaluation = createServerFn({ method: "POST" })
         model: data.model,
         agent_type: data.agentType,
         status: "generating",
-        scenario_count: data.scenarioCount,
+        scenario_count: effectiveScenarioCount,
       })
       .select()
       .single();
@@ -472,10 +496,10 @@ export const runEvaluation = createServerFn({ method: "POST" })
     const evalId: string = evalRow.id;
 
     try {
-      // 2. Generate scenarios
-      const { getSuite, computeReadiness, promptFingerprint } = await import("@/lib/eval-suites");
-      const suite = getSuite(data.suite);
-      const scenarios = await generateScenarios(data.systemPrompt, data.agentType, data.scenarioCount, suite.focus, data.model);
+      // 2. Fixed versioned scenarios for the vertical benchmark; generated suites stay dynamic.
+      const scenarios = fixedCases
+        ? fixedCases.map(({ category, user_goal, expected_behavior, opening_message }) => ({ category, user_goal, expected_behavior, opening_message }))
+        : await generateScenarios(data.systemPrompt, data.agentType, effectiveScenarioCount, suite.focus, data.model);
 
       // Insert pending rows
       await supabaseAdmin.from("scenarios").insert(
@@ -507,7 +531,15 @@ export const runEvaluation = createServerFn({ method: "POST" })
           if (i >= scenarios.length) return;
           const s = scenarios[i];
           try {
-            const r = await runAndJudgeScenario(data.systemPrompt, data.model, s);
+            const fixedCase = fixedCases?.[i];
+            const r = await runAndJudgeScenario(
+              data.systemPrompt,
+              data.model,
+              s,
+              fixedCase ? [fixedCase.opening_message, ...fixedCase.followUps] : undefined,
+              fixedCase?.checks,
+              fixedCase ? "google/gemini-2.5-pro" : undefined,
+            );
             results.push({ idx: i, scenario: s, result: r });
             await supabaseAdmin
               .from("scenarios")
@@ -643,6 +675,23 @@ ${failedSample || "(none)"}
       };
       const sCall = sumJson?.choices?.[0]?.message?.tool_calls?.[0];
       const summary = sCall ? JSON.parse(sCall.function.arguments) : null;
+      const benchmarkChecks = valid.flatMap((r) => r.result.deterministicChecks ?? []);
+      const benchmarkSummary = fixedCases
+        ? {
+            id: "real_estate_voice",
+            label: "Real-estate voice sales",
+            version: REAL_ESTATE_VOICE_BENCHMARK_VERSION,
+            sampleSize: fixedCases.length,
+            packSize: REAL_ESTATE_VOICE_BENCHMARK.length,
+            deterministicCheckCount: benchmarkChecks.length,
+            deterministicChecksPassed: benchmarkChecks.filter((check) => check.passed).length,
+            deterministicChecksFailed: benchmarkChecks.filter((check) => !check.passed).length,
+            deterministicPassRate: benchmarkChecks.length ? benchmarkChecks.filter((check) => check.passed).length / benchmarkChecks.length * 100 : 0,
+            judgeModel: "google/gemini-2.5-pro",
+            methodology: "Fixed multi-turn scripts, explicit deterministic gates, and an independent hosted LLM judge.",
+            limitation: "Deterministic checks cover only configured patterns. AI-judged dimensions are estimates. This is not a safety certification or an acoustic/telephony benchmark.",
+          }
+        : undefined;
 
       await supabaseAdmin
         .from("evaluations")
@@ -650,7 +699,7 @@ ${failedSample || "(none)"}
           status: "done",
           effectiveness_score: avgEff,
           hallucination_risk: avgHall,
-          summary: { ...summary, passRate, enterprise },
+          summary: { ...summary, passRate, enterprise, ...(benchmarkSummary ? { benchmark: benchmarkSummary } : {}) },
           updated_at: new Date().toISOString(),
         })
         .eq("id", evalId);
