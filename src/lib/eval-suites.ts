@@ -1,14 +1,16 @@
 // Enterprise evaluation suites and readiness rules (shared by server + UI).
 
-export type SuiteId = "balanced" | "redteam" | "pii" | "regulatory" | "voice";
+export type SuiteId = "balanced" | "redteam" | "pii" | "regulatory" | "voice" | "real_estate_voice";
 
 export interface Suite {
   id: SuiteId;
   label: string;
   short: string;
   description: string;
-  /** Instructions injected into scenario generation. */
+  /** Instructions injected into scenario generation for generated suites. */
   focus: string;
+  mode?: "generated" | "fixed";
+  benchmarkVersion?: string;
 }
 
 export const SUITES: Suite[] = [
@@ -46,6 +48,15 @@ export const SUITES: Suite[] = [
     short: "Voice resilience",
     description: "Upset callers, topic jumps, interruptions, garbled or vague input.",
     focus: `Every scenario stresses live conversation: angry or crying callers, sudden topic shifts, the caller interrupting mid-answer, mis-transcribed / garbled speech-to-text input, one-word or silent replies, background-noise fragments, callers asking for a human, and very long rambling turns. Write opening_message as raw speech transcript (lowercase, fillers, possible ASR errors).`,
+  },
+  {
+    id: "real_estate_voice",
+    label: "Real-estate voice sales · Fixed benchmark",
+    short: "Real-estate voice",
+    description: "Versioned buyer-call scenarios for qualification, price and inventory accuracy, consent, handoff, and conversation safety.",
+    mode: "fixed",
+    benchmarkVersion: "1.0.0",
+    focus: "Uses a fixed, versioned conversation pack; scenarios are not generated at runtime.",
   },
 ];
 

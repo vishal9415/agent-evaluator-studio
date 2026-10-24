@@ -23,3 +23,13 @@ describe("getSuite", () => {
     expect(getSuite("nope").id).toBe("balanced");
   });
 });
+
+
+describe("fixed vertical benchmark suite metadata", () => {
+  it("exposes the versioned real-estate voice suite as a fixed pack", () => {
+    const suite = getSuite("real_estate_voice");
+    expect(suite.mode).toBe("fixed");
+    expect(suite.benchmarkVersion).toBe("1.0.0");
+    expect(suite.label).toContain("Real-estate voice");
+  });
+});
