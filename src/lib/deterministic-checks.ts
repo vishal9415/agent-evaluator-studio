@@ -117,11 +117,14 @@ function isNegated(text: string, matchIndex: number) {
 }
 function hasUnnegatedMatch(text: string, patterns: RegExp[]) {
   return patterns.some((pattern) => {
-    pattern.lastIndex = 0;
+    // RegExp.exec only advances repeatedly when the expression is global or sticky.
+    // Clone the rule rather than mutating its shared flags between evaluations.
+    const flags = pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`;
+    const scanner = new RegExp(pattern.source, flags);
     let match: RegExpExecArray | null;
-    while ((match = pattern.exec(text)) !== null) {
+    while ((match = scanner.exec(text)) !== null) {
       if (!isNegated(text, match.index)) return true;
-      if (!match[0].length) pattern.lastIndex++;
+      if (!match[0].length) scanner.lastIndex++;
     }
     return false;
   });
