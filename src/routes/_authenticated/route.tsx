@@ -8,6 +8,7 @@ import {
   LogOut,
   Menu,
   Mic2,
+  Plug,
   ShieldCheck,
   Sparkles,
   X,
@@ -29,7 +30,8 @@ export const Route = createFileRoute("/_authenticated")({
 const navItems = [
   { to: "/playground" as const, label: "Evaluation studio", description: "Build, test & compare", number: "01", Icon: LayoutDashboard },
   { to: "/voice-reliability" as const, label: "Live Voice Studio", description: "Diagnose input & conversations", number: "02", Icon: Mic2 },
-  { to: "/guardrails" as const, label: "Guardrails", description: "Reduce agent risk", number: "03", Icon: ShieldCheck },
+  { to: "/integrations" as const, label: "Integrations", description: "Connect existing voice agents", number: "03", Icon: Plug },
+  { to: "/guardrails" as const, label: "Guardrails", description: "Reduce agent risk", number: "04", Icon: ShieldCheck },
 ];
 
 function Layout() {
