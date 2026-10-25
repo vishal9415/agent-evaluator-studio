@@ -145,11 +145,10 @@ export const Route = createFileRoute("/api/vapi-webhook")({
         const failedReason = /fail|error|busy|no.answer|unavailable/i.test(endedReason ?? "");
         const summary = integration.store_transcripts ? stringValue(analysis.summary ?? message.summary ?? call.summary, 10000) : null;
         const transcript = integration.store_transcripts ? stringValue(artifact.transcript ?? message.transcript, 50000) : null;
-        const analysisData = integration.store_transcripts
-          ? safeJson({
-              ...(isRecord(analysis.structuredData) ? { structuredData: analysis.structuredData } : {}),
-              ...(isRecord(analysis.successEvaluation) ? { successEvaluation: analysis.successEvaluation } : {}),
-            })
+        // Persist only a boolean success evaluation; arbitrary structured outputs
+        // can contain customer identifiers and are deliberately not retained here.
+        const analysisData = integration.store_transcripts && typeof analysis.successEvaluation === "boolean"
+          ? { successEvaluation: analysis.successEvaluation }
           : null;
         const cost = numberValue(call.cost ?? message.cost ?? analysis.cost, 0, 100_000);
         const callRow: Record<string, unknown> = {
