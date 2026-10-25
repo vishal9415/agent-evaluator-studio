@@ -17,6 +17,7 @@ import { Route as AuthenticatedIntegrationsRouteImport } from './routes/_authent
 import { Route as AuthenticatedPlaygroundRouteImport } from './routes/_authenticated/playground'
 import { Route as AuthenticatedVoiceReliabilityRouteImport } from './routes/_authenticated/voice-reliability'
 import { Route as ApiLocalVoiceStreamRouteImport } from './routes/api/local-voice-stream'
+import { Route as ApiVapiWebhookRouteImport } from './routes/api/vapi-webhook'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -57,24 +58,31 @@ const ApiLocalVoiceStreamRoute = ApiLocalVoiceStreamRouteImport.update({
   path: '/api/local-voice-stream',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiVapiWebhookRoute = ApiVapiWebhookRouteImport.update({
+  id: '/api/vapi-webhook',
+  path: '/api/vapi-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/guardrails': typeof AuthenticatedGuardrailsRoute
   '/integrations': typeof AuthenticatedIntegrationsRoute
-  '/integrations': typeof AuthenticatedIntegrationsRoute
   '/playground': typeof AuthenticatedPlaygroundRoute
   '/voice-reliability': typeof AuthenticatedVoiceReliabilityRoute
   '/api/local-voice-stream': typeof ApiLocalVoiceStreamRoute
+  '/api/vapi-webhook': typeof ApiVapiWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/guardrails': typeof AuthenticatedGuardrailsRoute
+  '/integrations': typeof AuthenticatedIntegrationsRoute
   '/playground': typeof AuthenticatedPlaygroundRoute
   '/voice-reliability': typeof AuthenticatedVoiceReliabilityRoute
   '/api/local-voice-stream': typeof ApiLocalVoiceStreamRoute
+  '/api/vapi-webhook': typeof ApiVapiWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -86,10 +94,11 @@ export interface FileRoutesById {
   '/_authenticated/playground': typeof AuthenticatedPlaygroundRoute
   '/_authenticated/voice-reliability': typeof AuthenticatedVoiceReliabilityRoute
   '/api/local-voice-stream': typeof ApiLocalVoiceStreamRoute
+  '/api/vapi-webhook': typeof ApiVapiWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/guardrails' | '/integrations' | '/playground' | '/voice-reliability' | '/api/local-voice-stream'
+  fullPaths: '/' | '/auth' | '/guardrails' | '/integrations' | '/playground' | '/voice-reliability' | '/api/local-voice-stream' | '/api/vapi-webhook'
   fileRoutesByTo: FileRoutesByTo
   to: '/' | '/auth' | '/guardrails' | '/integrations' | '/playground' | '/voice-reliability' | '/api/local-voice-stream'
   id:
@@ -102,6 +111,7 @@ export interface FileRouteTypes {
     | '/_authenticated/playground'
     | '/_authenticated/voice-reliability'
     | '/api/local-voice-stream'
+    | '/api/vapi-webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -109,6 +119,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ApiLocalVoiceStreamRoute: typeof ApiLocalVoiceStreamRoute
+  ApiVapiWebhookRoute: typeof ApiVapiWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -169,6 +180,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiLocalVoiceStreamRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/vapi-webhook': {
+      id: '/api/vapi-webhook'
+      path: '/api/vapi-webhook'
+      fullPath: '/api/vapi-webhook'
+      preLoaderRoute: typeof ApiVapiWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -194,6 +212,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ApiLocalVoiceStreamRoute: ApiLocalVoiceStreamRoute,
+  ApiVapiWebhookRoute: ApiVapiWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
