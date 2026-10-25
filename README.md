@@ -116,7 +116,7 @@ The Voice Reliability Studio includes a **Reliability casebook & feedback** sect
 
 ### Enable pilot feedback storage
 
-Apply the new migration `supabase/migrations/20261025090000_design_partner_reports.sql` **after** the existing migrations. For a remote development database, verify the linked project is the intended pilot project and review the dry run before pushing:
+Apply the new migration `supabase/migrations/20261025075016_design_partner_reports.sql` **after** the existing migrations. For a remote development database, verify the linked project is the intended pilot project and review the dry run before pushing:
 
 ```sh
 supabase migration list
