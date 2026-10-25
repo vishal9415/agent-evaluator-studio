@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import {
   AlertCircle,
   AudioLines,
@@ -19,6 +20,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
+import { listPrompts } from "@/lib/playground-data.functions";
+import { evaluateRecordingAgainstPrompt } from "@/lib/recording-prompt-evaluation.functions";
 
 const MAX_FILES = 10;
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
@@ -44,6 +47,32 @@ type AudioMetrics = {
 };
 
 type ReviewStatus = "ready" | "analyzing" | "complete" | "signal-unavailable";
+type PromptEvaluationStatus = "idle" | "running" | "complete" | "error";
+type PromptFinding = {
+  id: string;
+  category: string;
+  severity: "critical" | "high" | "medium" | "low";
+  title: string;
+  instructionQuote: string;
+  evidenceQuote: string;
+  instructionVerified: boolean;
+  evidenceVerified: boolean;
+  speaker: string;
+  explanation: string;
+  recommendation: string;
+  confidence: number;
+};
+type PromptEvaluation = {
+  model: string;
+  overallAssessment: "issues_found" | "no_clear_issues" | "insufficient_transcript";
+  summary: string;
+  strengths: string[];
+  reviewLimitations: string[];
+  findings: PromptFinding[];
+  evaluatedAt: string;
+  promptFingerprint: string;
+};
+type SavedPrompt = { id: string; name: string; system_prompt: string; model: string; agent_type: string };
 
 type Recording = {
   id: string;
@@ -53,6 +82,9 @@ type Recording = {
   status: ReviewStatus;
   metrics: AudioMetrics | null;
   findings: Finding[];
+  promptEvaluation?: PromptEvaluation | null;
+  promptEvalStatus?: PromptEvaluationStatus;
+  promptEvalError?: string | null;
 };
 
 function makeId() {
@@ -73,6 +105,15 @@ function formatDuration(value: number) {
 
 function dbfs(value: number) {
   return value <= 0.000000001 ? "−∞ dBFS" : (20 * Math.log10(value)).toFixed(1) + " dBFS";
+}
+
+function fingerprintPrompt(value: string) {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
 }
 
 function normalizeLine(value: string) {
@@ -294,9 +335,16 @@ function FindingBadge({ level }: { level: Finding["level"] }) {
 }
 
 export function RecordingReview() {
+  const loadSavedPrompts = useServerFn(listPrompts);
+  const evaluateAgainstPrompt = useServerFn(evaluateRecordingAgainstPrompt);
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [uploadMessage, setUploadMessage] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [promptText, setPromptText] = useState("");
+  const [selectedSavedPromptId, setSelectedSavedPromptId] = useState("");
+  const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([]);
+  const [promptLoadError, setPromptLoadError] = useState("");
+  const [promptBatchRunning, setPromptBatchRunning] = useState(false);
   const recordingsRef = useRef<Recording[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -307,6 +355,18 @@ export function RecordingReview() {
   useEffect(() => () => {
     recordingsRef.current.forEach((recording) => URL.revokeObjectURL(recording.url));
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadSavedPrompts()
+      .then((items) => {
+        if (!cancelled) setSavedPrompts((items ?? []) as SavedPrompt[]);
+      })
+      .catch((cause) => {
+        if (!cancelled) setPromptLoadError(cause instanceof Error ? cause.message : "Could not load your saved prompts.");
+      });
+    return () => { cancelled = true; };
+  }, [loadSavedPrompts]);
 
   function patchRecording(id: string, patch: Partial<Recording>) {
     setRecordings((current) => current.map((recording) => recording.id === id ? { ...recording, ...patch } : recording));
@@ -358,6 +418,9 @@ export function RecordingReview() {
         status: "ready",
         metrics: null,
         findings: [],
+        promptEvaluation: null,
+        promptEvalStatus: "idle",
+        promptEvalError: null,
       });
     }
 
@@ -474,6 +537,61 @@ export function RecordingReview() {
     }
   }
 
+  async function runPromptEvaluation(recording: Recording, allowBusy = false, promptOverride = promptText) {
+    const activePrompt = promptOverride.trim();
+    if (busyId && !allowBusy) return;
+    if (activePrompt.length < 20) {
+      toast.error("Choose a saved prompt or paste the production prompt first.");
+      return;
+    }
+    if (recording.transcript.trim().length < 20) {
+      toast.error("Add a transcript or use Transcribe & analyze before checking this call against the prompt.");
+      return;
+    }
+
+    setBusyId(recording.id);
+    patchRecording(recording.id, { promptEvalStatus: "running", promptEvalError: null });
+    try {
+      const result = await evaluateAgainstPrompt({
+        data: { prompt: activePrompt, transcript: recording.transcript.trim(), recordingName: recording.file.name },
+      }) as PromptEvaluation;
+      patchRecording(recording.id, { promptEvaluation: result, promptEvalStatus: "complete", promptEvalError: null });
+      toast.success("Prompt-aware review completed for " + recording.file.name);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Prompt-aware review failed.";
+      patchRecording(recording.id, { promptEvalStatus: "error", promptEvalError: message });
+      toast.error(message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function runPromptEvaluationForBatch() {
+    const activePrompt = promptText.trim();
+    if (activePrompt.length < 20) {
+      toast.error("Choose a saved prompt or paste the production prompt first.");
+      return;
+    }
+    const eligible = recordings.filter((recording) => recording.transcript.trim().length >= 20);
+    if (!eligible.length) {
+      toast.error("Transcribe or paste a transcript for at least one recording first.");
+      return;
+    }
+    const skipped = recordings.length - eligible.length;
+    const extra = skipped ? " " + skipped + " recording(s) without a transcript will be skipped." : "";
+    if (!window.confirm("This will send " + eligible.length + " transcript(s) and the selected prompt to the hosted AI evaluator. It may consume Lovable AI gateway credits. Continue?" + extra)) return;
+
+    setPromptBatchRunning(true);
+    try {
+      for (const recording of eligible) {
+        await runPromptEvaluation(recording, true, activePrompt);
+      }
+    } finally {
+      setPromptBatchRunning(false);
+      setBusyId(null);
+    }
+  }
+
   async function analyzeAll() {
     for (const recording of recordings) {
       await analyzeRecording(recording, true);
@@ -514,6 +632,65 @@ export function RecordingReview() {
           />
         </div>
       </div>
+
+      <Card className="border-border/80 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base"><FileText className="h-4 w-4 text-brand" /> Evaluate against the production prompt</CardTitle>
+          <CardDescription>
+            Select a saved PromptLab prompt or paste the exact instructions used by your live agent. Findings cite both the prompt and the transcript.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-1.5">
+            <label htmlFor="recording-saved-prompt" className="text-xs font-medium">Saved prompt (optional)</label>
+            <select
+              id="recording-saved-prompt"
+              value={selectedSavedPromptId}
+              onChange={(event) => {
+                const id = event.target.value;
+                setSelectedSavedPromptId(id);
+                if (id) {
+                  const selected = savedPrompts.find((item) => item.id === id);
+                  if (selected) setPromptText(selected.system_prompt);
+                }
+              }}
+              disabled={busyId !== null}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <option value="">Paste a prompt manually</option>
+              {savedPrompts.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+            {promptLoadError && <p className="text-xs text-amber-700 dark:text-amber-300">{promptLoadError} You can still paste the production prompt below.</p>}
+            {!promptLoadError && savedPrompts.length === 0 && <p className="text-xs text-muted-foreground">No saved prompts found. Paste the production prompt below or save one in Evaluation Studio.</p>}
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="recording-production-prompt" className="text-xs font-medium">Production system prompt</label>
+            <Textarea
+              id="recording-production-prompt"
+              value={promptText}
+              onChange={(event) => { setPromptText(event.target.value); setSelectedSavedPromptId(""); }}
+              placeholder="Paste the exact instructions used by the deployed voice agent…"
+              rows={5}
+              maxLength={20000}
+              disabled={busyId !== null}
+              className="text-sm"
+            />
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[10px] text-muted-foreground">{promptText.length.toLocaleString()} / 20,000 characters</span>
+              <span className="text-[10px] text-muted-foreground">{savedPrompts.length} saved prompt(s) available</span>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/25 bg-amber-500/[0.04] p-3">
+            <p className="max-w-3xl text-xs leading-5 text-muted-foreground">
+              <span className="font-semibold text-foreground">AI evaluation uses hosted inference.</span> The selected prompt and transcript are sent to the Lovable AI gateway and may consume workspace AI credits. PromptLab does not save these transcripts or reports in the database in this flow. Quick audio checks remain local.
+            </p>
+            <Button onClick={() => void runPromptEvaluationForBatch()} disabled={busyId !== null || promptBatchRunning || promptText.trim().length < 20 || !recordings.some((item) => item.transcript.trim().length >= 20)}>
+              {promptBatchRunning ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Waves className="mr-2 h-4 w-4" />}
+              Evaluate transcripts
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-3 md:grid-cols-3">
         <div className="rounded-xl border border-border/80 bg-card p-3.5">
@@ -574,6 +751,10 @@ export function RecordingReview() {
                       <RefreshCw className="mr-2 h-4 w-4" />
                       Quick checks
                     </Button>
+                    <Button variant="outline" size="sm" onClick={() => void runPromptEvaluation(recording)} disabled={busyId !== null || promptText.trim().length < 20 || recording.transcript.trim().length < 20}>
+                      {recording.promptEvalStatus === "running" ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+                      Check vs prompt
+                    </Button>
                     <Button variant="ghost" size="icon" aria-label={"Remove " + recording.file.name} onClick={() => removeRecording(recording.id)} disabled={busyId !== null}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -611,7 +792,7 @@ export function RecordingReview() {
                   <Textarea
                     id={"transcript-" + recording.id}
                     value={recording.transcript}
-                    onChange={(event) => patchRecording(recording.id, { transcript: event.target.value, status: "ready", findings: [], metrics: null })}
+                    onChange={(event) => patchRecording(recording.id, { transcript: event.target.value, status: "ready", findings: [], metrics: null, promptEvaluation: null, promptEvalStatus: "idle", promptEvalError: null })}
                     placeholder={"Agent: Hi, can I help you?\nCaller: I'm looking for a 2 BHK...\nAgent: What is your budget?"}
                     rows={4}
                     maxLength={50000}
@@ -650,6 +831,100 @@ export function RecordingReview() {
                       <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                       Findings are heuristic flags for human review, not proof of an agent fault. Confirm each against the original recording before drawing conclusions.
                     </p>
+                  </div>
+                )}
+
+                {(recording.promptEvalStatus === "running" || recording.promptEvalError || recording.promptEvaluation) && (
+                  <div className="space-y-3 rounded-2xl border border-brand/20 bg-brand/[0.025] p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <h4 className="flex items-center gap-2 text-sm font-semibold"><ShieldCheck className="h-4 w-4 text-brand" /> Prompt-aware evaluation</h4>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">Compares the selected production prompt with the agent's observed behavior in this transcript.</p>
+                      </div>
+                      {recording.promptEvalStatus === "running" && <span className="inline-flex items-center gap-2 rounded-full border border-brand/20 px-2.5 py-1 text-xs"><LoaderCircle className="h-3.5 w-3.5 animate-spin" /> Evaluating</span>}
+                      {recording.promptEvaluation && (
+                        <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
+                          recording.promptEvaluation.overallAssessment === "issues_found"
+                            ? "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-200"
+                            : recording.promptEvaluation.overallAssessment === "no_clear_issues"
+                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200"
+                              : "border-sky-500/30 bg-sky-500/10 text-sky-800 dark:text-sky-200"
+                        }`}>
+                          {recording.promptEvaluation.overallAssessment === "issues_found" ? "Issues to review" : recording.promptEvaluation.overallAssessment === "no_clear_issues" ? "No clear issues found" : "Transcript insufficient"}
+                        </span>
+                      )}
+                    </div>
+                    {recording.promptEvalError && <div role="alert" className="rounded-lg border border-destructive/25 bg-destructive/5 p-3 text-xs leading-5 text-destructive">{recording.promptEvalError}</div>}
+                    {recording.promptEvaluation && (
+                      <>
+                        {recording.promptEvaluation.promptFingerprint !== fingerprintPrompt(promptText.trim()) && (
+                          <div className="rounded-lg border border-amber-500/30 bg-amber-500/[0.05] p-3 text-xs leading-5 text-amber-900 dark:text-amber-100">
+                            The selected prompt has changed since this report was generated. Re-run the evaluation to refresh these findings.
+                          </div>
+                        )}
+                        <p className="text-sm leading-6">{recording.promptEvaluation.summary}</p>
+                        <div className="grid gap-2 sm:grid-cols-3">
+                          <div className="rounded-lg border border-border bg-card p-3"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Findings</p><p className="mt-1 text-lg font-semibold">{recording.promptEvaluation.findings.length}</p></div>
+                          <div className="rounded-lg border border-border bg-card p-3"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Prompt fingerprint</p><p className="mt-1 font-mono text-sm">{recording.promptEvaluation.promptFingerprint}</p></div>
+                          <div className="rounded-lg border border-border bg-card p-3"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Model</p><p className="mt-1 text-sm font-medium">Gemini 2.5 Flash Lite</p></div>
+                        </div>
+                        {recording.promptEvaluation.findings.length === 0 ? (
+                          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] p-3 text-xs leading-5 text-muted-foreground">No specific prompt violation was supported by the supplied evidence. This is not proof that the call was error-free.</div>
+                        ) : (
+                          <div className="space-y-3">
+                            {recording.promptEvaluation.findings.map((finding) => (
+                              <div key={finding.id} className="rounded-xl border border-border bg-card p-3.5">
+                                <div className="flex flex-wrap items-start justify-between gap-2">
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-semibold">{finding.title}</p>
+                                    <p className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">{finding.category.replaceAll("_", " ")} · {finding.speaker || "Speaker unclear"}</p>
+                                  </div>
+                                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                                    finding.severity === "critical" || finding.severity === "high"
+                                      ? "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300"
+                                      : finding.severity === "medium"
+                                        ? "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-200"
+                                        : "border-sky-500/30 bg-sky-500/10 text-sky-800 dark:text-sky-200"
+                                  }`}>{finding.severity} · {Math.round(finding.confidence * 100)}% confidence</span>
+                                </div>
+                                <p className="mt-2 text-xs leading-5 text-muted-foreground">{finding.explanation}</p>
+                                <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                                  <div className={`rounded-lg border p-3 ${finding.instructionVerified ? "border-brand/15 bg-brand/[0.035]" : "border-amber-500/30 bg-amber-500/[0.04]"}`}>
+                                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Prompt instruction {finding.instructionVerified ? "· matched" : "· verify quote"}</p>
+                                    <p className="mt-1.5 whitespace-pre-wrap text-xs leading-5">“{finding.instructionQuote || "No matching excerpt supplied"}”</p>
+                                  </div>
+                                  <div className={`rounded-lg border p-3 ${finding.evidenceVerified ? "border-brand/15 bg-brand/[0.035]" : "border-amber-500/30 bg-amber-500/[0.04]"}`}>
+                                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Transcript evidence {finding.evidenceVerified ? "· matched" : "· verify quote"}</p>
+                                    <p className="mt-1.5 whitespace-pre-wrap text-xs leading-5">“{finding.evidenceQuote || "No matching excerpt supplied"}”</p>
+                                  </div>
+                                </div>
+                                <div className="mt-3 rounded-lg border border-emerald-500/15 bg-emerald-500/[0.035] p-3">
+                                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Recommended fix</p>
+                                  <p className="mt-1.5 text-xs leading-5">{finding.recommendation}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {recording.promptEvaluation.strengths.length > 0 && (
+                          <div className="rounded-xl border border-emerald-500/20 p-3.5">
+                            <p className="text-xs font-semibold">Observed strengths</p>
+                            <ul className="mt-2 list-disc space-y-1 pl-4 text-xs leading-5 text-muted-foreground">
+                              {recording.promptEvaluation.strengths.map((item, i) => <li key={i}>{item}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                        {recording.promptEvaluation.reviewLimitations.length > 0 && (
+                          <div className="rounded-xl border border-border p-3.5">
+                            <p className="text-xs font-semibold">Limitations to keep in mind</p>
+                            <ul className="mt-2 list-disc space-y-1 pl-4 text-xs leading-5 text-muted-foreground">
+                              {recording.promptEvaluation.reviewLimitations.map((item, i) => <li key={i}>{item}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                        <p className="text-[10px] leading-5 text-muted-foreground">Generated {new Date(recording.promptEvaluation.evaluatedAt).toLocaleString()}. The report stays in this page's memory and is not saved to PromptLab's database. Verify findings against the full call before acting on them.</p>
+                      </>
+                    )}
                   </div>
                 )}
               </CardContent>
