@@ -137,13 +137,17 @@ export const Route = createFileRoute("/api/recording-transcribe")({
           return errorResponse("The transcription provider returned an invalid response.", 502);
         }
 
-        const transcript = formatSpeakerTranscript(result.words) ?? (typeof result.text === "string" ? result.text.trim() : "");
+        const formattedTranscript = formatSpeakerTranscript(result.words);
+        const transcript = formattedTranscript ?? (typeof result.text === "string" ? result.text.trim() : "");
         if (!transcript) return errorResponse("No transcript was returned for this recording.", 422);
+        const hasSpeakerIds = Array.isArray(result.words) && result.words.some((item) =>
+          item !== null && typeof item === "object" && typeof (item as { speaker_id?: unknown }).speaker_id === "string"
+        );
 
         return Response.json({
           transcript: transcript.slice(0, 50000),
           languageCode: typeof result.language_code === "string" ? result.language_code : null,
-          diarized: Boolean(formatSpeakerTranscript(result.words)),
+          diarized: Boolean(formattedTranscript && hasSpeakerIds),
         });
       },
     },
