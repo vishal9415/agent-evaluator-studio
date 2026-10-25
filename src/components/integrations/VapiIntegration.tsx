@@ -210,7 +210,7 @@ export function VapiIntegration() {
                     />
                     <span className="min-w-0">
                       <span className="block text-sm font-medium">Store transcripts and summaries</span>
-                      <span className="mt-1 block text-xs leading-5 text-muted-foreground">Off by default. When enabled, completed-call transcript text, summary and selected analysis fields are retained for review. Caller names/phone numbers and recording URLs are not copied into PromptLab's call table.</span>
+                      <span className="mt-1 block text-xs leading-5 text-muted-foreground">Off by default. When enabled, completed-call transcript text, summary and a boolean success-evaluation result is retained for review. No dedicated caller-name/phone fields or recording URLs are stored. Opted-in transcript and summary text may itself contain personal data, so enable retention only when you have the appropriate consent and retention policy.</span>
                     </span>
                   </label>
                   {integration && (
