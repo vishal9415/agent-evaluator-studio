@@ -12,8 +12,8 @@ import { realtimeRequestSchema } from "./openai-realtime.schema";
 export const createOpenAIRealtimeAnswer = createServerFn({ method: "POST" })
   .inputValidator((input) => realtimeRequestSchema.parse(input))
   .handler(async ({ data }) => {
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabasePublishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
+    const supabaseUrl = process.env.PROMPTLAB_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
+    const supabasePublishableKey = process.env.PROMPTLAB_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
     const openAiApiKey = process.env.OPENAI_API_KEY;
 
     if (!supabaseUrl || !supabasePublishableKey) {
