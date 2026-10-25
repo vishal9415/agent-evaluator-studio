@@ -28,16 +28,6 @@ function numberValue(value: unknown, min = 0, max = 1_000_000): number | null {
   return Number.isFinite(parsed) && parsed >= min && parsed <= max ? parsed : null;
 }
 
-function safeJson(value: unknown, maxChars = 12000): JsonRecord | null {
-  if (!isRecord(value)) return null;
-  try {
-    const text = JSON.stringify(value);
-    if (text.length > maxChars) return null;
-    return JSON.parse(text) as JsonRecord;
-  } catch {
-    return null;
-  }
-}
 
 function errorResponse(message: string, status: number): Response {
   return Response.json({ error: message }, { status });
