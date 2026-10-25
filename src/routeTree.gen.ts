@@ -100,7 +100,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths: '/' | '/auth' | '/guardrails' | '/integrations' | '/playground' | '/voice-reliability' | '/api/local-voice-stream' | '/api/vapi-webhook'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/guardrails' | '/integrations' | '/playground' | '/voice-reliability' | '/api/local-voice-stream'
+  to: '/' | '/auth' | '/guardrails' | '/integrations' | '/playground' | '/voice-reliability' | '/api/local-voice-stream' | '/api/vapi-webhook'
   id:
     | '__root__'
     | '/'
