@@ -376,8 +376,8 @@ export function RecordingReview() {
     setRecordings((current) => current.filter((item) => item.id !== id));
   }
 
-  async function analyzeRecording(recording: Recording) {
-    if (busyId) return;
+  async function analyzeRecording(recording: Recording, allowBusy = false) {
+    if (busyId && !allowBusy) return;
     setBusyId(recording.id);
     patchRecording(recording.id, { status: "analyzing", findings: [], metrics: null });
     const findings: Finding[] = [];
@@ -464,10 +464,10 @@ export function RecordingReview() {
         metrics: null,
       });
       toast.success(result.diarized ? "Transcription completed with speaker labels." : "Transcription completed.");
-      await analyzeRecording({ ...recording, transcript: nextTranscript });
+      await analyzeRecording({ ...recording, transcript: nextTranscript }, true);
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Transcription failed. Please retry.";
-      patchRecording(recording.id, { status: recording.metrics ? "complete" : "ready" });
+      patchRecording(recording.id, { status: recording.status });
       toast.error(message);
     } finally {
       setBusyId(null);
@@ -476,7 +476,7 @@ export function RecordingReview() {
 
   async function analyzeAll() {
     for (const recording of recordings) {
-      await analyzeRecording(recording);
+      await analyzeRecording(recording, true);
     }
   }
 
