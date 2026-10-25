@@ -28,7 +28,7 @@ export const Route = createFileRoute("/_authenticated")({
 
 const navItems = [
   { to: "/playground" as const, label: "Evaluation studio", description: "Build, test & compare", number: "01", Icon: LayoutDashboard },
-  { to: "/voice-reliability" as const, label: "Voice Reliability", description: "Inspect live audio paths", number: "02", Icon: Mic2 },
+  { to: "/voice-reliability" as const, label: "Live Voice Studio", description: "Diagnose input & conversations", number: "02", Icon: Mic2 },
   { to: "/guardrails" as const, label: "Guardrails", description: "Reduce agent risk", number: "03", Icon: ShieldCheck },
 ];
 
@@ -100,13 +100,13 @@ function Layout() {
 
         <div className="mx-4 mt-5 rounded-2xl border border-white/10 bg-white/[0.035] p-4">
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-200">
-            <Sparkles className="h-3.5 w-3.5 text-emerald-300" /> A better agent loop
+            <Sparkles className="h-3.5 w-3.5 text-emerald-300" /> Live reliability loop
           </div>
           <div className="mt-3 space-y-2.5">
             {[
-              ["01", "Configure", "Set the prompt and model"],
-              ["02", "Evaluate", "Test real failure cases"],
-              ["03", "Improve", "Compare and save changes"],
+              ["01", "Listen", "Inspect the incoming audio"],
+              ["02", "Recover", "Validate details and handle failures"],
+              ["03", "Verify", "Replay the case and compare outcomes"],
             ].map(([number, title, description]) => (
               <div key={number} className="flex items-start gap-2.5">
                 <span className="mt-0.5 font-mono text-[10px] text-emerald-300/80">{number}</span>

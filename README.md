@@ -55,10 +55,11 @@ The Voice Reliability Lab connects to OpenAI Realtime through server-side SDP ne
 
 ### Free local models with Ollama
 
-PromptLab includes two optional local chat models that do not require a paid model API:
+PromptLab includes three optional local chat models that do not require a paid model API:
 
-- `ollama/qwen3:4b` — recommended first try; downloads about 2.5 GB.
-- `ollama/llama3.2:3b` — smaller alternative; downloads about 2 GB.
+- `ollama/llama3.2:1b` — fastest local option; downloads roughly 1.3 GB, but is less reliable at complex reasoning and critical-detail preservation.
+- `ollama/llama3.2:3b` — a balanced small model; downloads about 2 GB.
+- `ollama/qwen3:4b` — another local option for quality comparisons; downloads about 2.5 GB.
 
 These run on your own Mac using Ollama's local OpenAI-compatible API. They do not charge per-token API fees, though they use local memory, compute, electricity, and disk space. Model quality and speed depend on your hardware.
 
@@ -66,8 +67,9 @@ These run on your own Mac using Ollama's local OpenAI-compatible API. They do no
 2. In Terminal, download one or both models:
 
    ```sh
-   ollama pull qwen3:4b
+   ollama pull llama3.2:1b
    ollama pull llama3.2:3b
+   ollama pull qwen3:4b
    ```
 
 3. Leave Ollama running, then start PromptLab with `npm run dev`.
@@ -77,7 +79,7 @@ PromptLab connects to `http://127.0.0.1:11434/v1` by default. Override this with
 
 The initial local connection uses Ollama's OpenAI-compatible `/v1/chat/completions` endpoint. Tool-calling reliability varies by model; Qwen3 is the recommended first model for automated evaluations. Live audio in Voice Reliability Lab still uses OpenAI Realtime and is a separate, paid provider path.
 
-Voice Reliability Lab includes a **Local Ollama** tab alongside the unchanged **OpenAI Realtime** tab. The local tab uses the selected Ollama model for text generation, the browser's SpeechRecognition API for microphone transcription when supported, and browser/system speech synthesis for spoken replies. Browser speech recognition may process audio online, so this mode should not be described as fully offline. It does not write the local conversation or event timeline to PromptLab voice-session history. Typed text input remains available if browser speech recognition is unsupported. The two modes use different pipelines and their latency figures are not directly comparable.
+Voice Reliability Lab includes a **Local Ollama** tab alongside the unchanged **OpenAI Realtime** tab. The local tab uses the selected Ollama model for text generation, the browser's SpeechRecognition API for microphone transcription when supported, and browser/system speech synthesis for spoken replies. Local replies stream from Ollama so text renders token-by-token and speech can start at completed phrase boundaries before the full reply is generated. The panel measures time to first model token separately from full generation time. It includes a voice selector and speaking-rate control; naturalness depends on the speech voices installed in the operating system and exposed by the browser. On macOS, installing an Enhanced or Premium English voice can improve quality at no API cost. Browser speech recognition may process audio online, so this mode should not be described as fully offline. It does not write the local conversation or event timeline to PromptLab voice-session history. Typed text input remains available if browser speech recognition is unsupported. The two modes use different pipelines and their latency figures are not directly comparable.
 
 ### Supabase migrations and local pilot allowance
 

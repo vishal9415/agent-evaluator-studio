@@ -4,6 +4,7 @@ import { Mic, PhoneOff, Radio, ShieldCheck, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { DEFAULT_PROMPT } from "@/lib/playground-constants";
 import { createOpenAIRealtimeAnswer } from "@/lib/voice-adapters/openai-realtime.functions";
@@ -16,6 +17,13 @@ import { waitForIceGatheringComplete } from "@/lib/voice-adapters/ice-gathering"
 type SessionState = "idle" | "connecting" | "connected" | "ended" | "error";
 type TimelineEvent = { id: number; time: string; elapsedMs: number; type: string; detail: string };
 type TranscriptItem = { id: number; role: "Caller" | "Agent"; text: string };
+type AudioTrackSnapshot = {
+  sampleRate?: number;
+  channelCount?: number;
+  noiseSuppression?: boolean;
+  echoCancellation?: boolean;
+  autoGainControl?: boolean;
+};
 type UnknownRecord = Record<string, unknown>;
 
 function asRecord(value: unknown): UnknownRecord {
@@ -58,6 +66,10 @@ export function LiveRealtimeTest() {
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [transcript, setTranscript] = useState<TranscriptItem[]>([]);
   const [observedGapMs, setObservedGapMs] = useState<number | null>(null);
+  const [noiseSuppression, setNoiseSuppression] = useState(true);
+  const [echoCancellation, setEchoCancellation] = useState(true);
+  const [autoGainControl, setAutoGainControl] = useState(false);
+  const [audioTrackSettings, setAudioTrackSettings] = useState<AudioTrackSnapshot | null>(null);
 
   const negotiate = useServerFn(createOpenAIRealtimeAnswer);
   const persistSessionEvent = useServerFn(recordVoiceSessionEvent);
@@ -175,6 +187,7 @@ export function LiveRealtimeTest() {
     setEvents([]);
     setTranscript([]);
     setObservedGapMs(null);
+    setAudioTrackSettings(null);
     sequenceRef.current = 0;
     seenAssistantResponseIdsRef.current.clear();
     speechStoppedAtRef.current = null;
@@ -188,9 +201,29 @@ export function LiveRealtimeTest() {
       if (sessionError || !accessToken) throw new Error("Sign in again to start a live voice session.");
 
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
+        audio: { echoCancellation, noiseSuppression, autoGainControl },
       });
       streamRef.current = stream;
+      const audioTrack = stream.getAudioTracks()[0];
+      const audioSettings = audioTrack?.getSettings();
+      const snapshot: AudioTrackSnapshot = {
+        sampleRate: audioSettings?.sampleRate,
+        channelCount: audioSettings?.channelCount,
+        noiseSuppression: audioSettings?.noiseSuppression,
+        echoCancellation: audioSettings?.echoCancellation,
+        autoGainControl: audioSettings?.autoGainControl,
+      };
+      setAudioTrackSettings(snapshot);
+      pushEvent(
+        "browser.audio_processing_settings",
+        "Requested NS=" + noiseSuppression +
+          ", EC=" + echoCancellation +
+          ", AGC=" + autoGainControl +
+          "; browser-reported NS=" + String(snapshot.noiseSuppression ?? "unknown") +
+          ", EC=" + String(snapshot.echoCancellation ?? "unknown") +
+          ", AGC=" + String(snapshot.autoGainControl ?? "unknown") +
+          ", sample rate=" + String(snapshot.sampleRate ?? "unknown") + " Hz.",
+      );
 
       const pc = new RTCPeerConnection();
       pcRef.current = pc;
@@ -334,6 +367,61 @@ export function LiveRealtimeTest() {
             <p className="flex items-center gap-2 font-medium"><ShieldCheck className="h-4 w-4" /> Before you start</p>
             <p className="mt-1 text-muted-foreground">Your microphone will be active while the session is running. Speak only with consent from anyone whose voice may be captured. End the session to stop microphone capture.</p>
           </div>
+          <section className="rounded-xl border border-border/80 bg-muted/20 p-4">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h3 className="text-sm font-semibold">Live input processing</h3>
+                <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
+                  These settings are requested from the browser microphone before audio enters the live WebRTC session. Actual support varies by browser and device; PromptLab displays the settings the browser reports after capture starts.
+                </p>
+              </div>
+              <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[10px] text-muted-foreground">
+                <ShieldCheck className="h-3 w-3" /> Applied at capture
+              </span>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              {[
+                { label: "Noise suppression", description: "Reduce ambient noise", checked: noiseSuppression, onCheckedChange: setNoiseSuppression },
+                { label: "Echo cancellation", description: "Reduce speaker-to-mic echo", checked: echoCancellation, onCheckedChange: setEchoCancellation },
+                { label: "Auto gain control", description: "Normalize input level", checked: autoGainControl, onCheckedChange: setAutoGainControl },
+              ].map((setting) => (
+                <div key={setting.label} className="flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-card p-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium">{setting.label}</p>
+                    <p className="mt-0.5 text-[10px] leading-4 text-muted-foreground">{setting.description}</p>
+                  </div>
+                  <Switch
+                    checked={setting.checked}
+                    onCheckedChange={setting.onCheckedChange}
+                    disabled={active}
+                    aria-label={setting.label}
+                  />
+                </div>
+              ))}
+            </div>
+            {audioTrackSettings && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {[
+                  ["Noise suppression", audioTrackSettings.noiseSuppression],
+                  ["Echo cancellation", audioTrackSettings.echoCancellation],
+                  ["Auto gain", audioTrackSettings.autoGainControl],
+                ].map(([label, value]) => (
+                  <span key={String(label)} className="rounded-full bg-muted px-2.5 py-1 text-[10px] text-muted-foreground">
+                    {String(label)}: <strong className="text-foreground">{typeof value === "boolean" ? (value ? "On" : "Off") : "Not reported"}</strong>
+                  </span>
+                ))}
+                <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] text-muted-foreground">
+                  Sample rate: <strong className="text-foreground">{audioTrackSettings.sampleRate ? Math.round(audioTrackSettings.sampleRate / 100) / 10 + " kHz" : "Not reported"}</strong>
+                </span>
+                <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] text-muted-foreground">
+                  Channels: <strong className="text-foreground">{audioTrackSettings.channelCount ?? "Not reported"}</strong>
+                </span>
+              </div>
+            )}
+            <p className="mt-3 text-[11px] leading-5 text-muted-foreground">
+              Browser processing is not a substitute for primary-speaker separation, network jitter control or recovery logic. Change settings between sessions and compare the same noisy scenario; no raw audio is saved by this panel.
+            </p>
+          </section>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="space-y-1.5 text-sm font-medium">Realtime model
               <select className="h-10 w-full rounded-md border border-input bg-background px-3 font-normal" value={model} onChange={(event) => setModel(event.target.value as typeof model)} disabled={active}>

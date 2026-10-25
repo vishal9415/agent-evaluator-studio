@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { DEFAULT_PROMPT } from "@/lib/playground-constants";
-import { listLocalVoiceModels, localVoiceChat } from "@/lib/local-voice.functions";
+import { supabase } from "@/integrations/supabase/client";
+import { listLocalVoiceModels } from "@/lib/local-voice.functions";
 
-type LocalModel = "ollama/llama3.2:3b" | "ollama/qwen3:4b";
+type LocalModel = "ollama/llama3.2:1b" | "ollama/llama3.2:3b" | "ollama/qwen3:4b";
 type ChatMessage = { role: "user" | "assistant"; content: string; id: number };
 type LocalEvent = { id: number; elapsedMs: number; type: string; detail: string };
 type RecognitionAlternativeLike = { transcript: string };
@@ -34,9 +34,22 @@ type SpeechWindow = Window & {
 };
 
 const MODEL_OPTIONS: Array<{ value: LocalModel; label: string }> = [
-  { value: "ollama/llama3.2:3b", label: "Llama 3.2 3B" },
+  { value: "ollama/llama3.2:1b", label: "Llama 3.2 1B · fastest, lower accuracy" },
+  { value: "ollama/llama3.2:3b", label: "Llama 3.2 3B · balanced" },
   { value: "ollama/qwen3:4b", label: "Qwen3 4B" },
 ];
+
+const DEFAULT_VOICE_PROMPT = `You are a warm, concise real-estate lead qualification agent.
+
+Capture these details accurately: city/locality, property type, bedrooms, maximum budget with currency, and purchase timeline.
+- Use one or two short, natural sentences per turn.
+- Ask only one useful follow-up question at a time.
+- Briefly confirm critical details without repeatedly restating the entire conversation.
+- A clear yes/no answer confirms the immediately preceding question. Do not ask for the same detail again.
+- Treat a locality the caller names, such as Whitefield, as sufficient unless they ask to narrow it further or a more specific location is genuinely necessary.
+- Preserve the caller's latest explicit correction. Never revert to an earlier budget, location, bedroom count or date.
+- Never infer details the caller has not supplied. If a critical value is unclear, ask the caller to repeat that value only.
+- Do not claim property availability has been verified.`;
 
 const STATUS_LABELS: Record<string, string> = {
   idle: "Ready",
@@ -47,8 +60,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 export function LocalVoiceTest() {
   const checkModels = useServerFn(listLocalVoiceModels);
-  const runLocalChat = useServerFn(localVoiceChat);
-  const [instructions, setInstructions] = useState(DEFAULT_PROMPT);
+  const [instructions, setInstructions] = useState(DEFAULT_VOICE_PROMPT);
   const [model, setModel] = useState<LocalModel>("ollama/llama3.2:3b");
   const [installedModels, setInstalledModels] = useState<LocalModel[]>([]);
   const [ollamaReachable, setOllamaReachable] = useState<boolean | null>(null);
@@ -59,6 +71,9 @@ export function LocalVoiceTest() {
   const [voiceActive, setVoiceActive] = useState(false);
   const [error, setError] = useState("");
   const [lastLatencyMs, setLastLatencyMs] = useState<number | null>(null);
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedVoiceURI, setSelectedVoiceURI] = useState("");
+  const [speechRate, setSpeechRate] = useState(1);
   const [events, setEvents] = useState<LocalEvent[]>([]);
   const recognizerRef = useRef<RecognitionLike | null>(null);
   const startRecognizerRef = useRef<(() => void) | null>(null);
@@ -69,6 +84,9 @@ export function LocalVoiceTest() {
   const restartTimerRef = useRef<number | null>(null);
   const sequenceRef = useRef(0);
   const startedAtRef = useRef<number | null>(null);
+  const speechQueueRef = useRef<string[]>([]);
+  const speechStreamCompleteRef = useRef(false);
+  const speakNextRef = useRef<(() => void) | null>(null);
 
   const refreshModels = useCallback(async () => {
     setCheckingModels(true);
@@ -81,7 +99,7 @@ export function LocalVoiceTest() {
       setInstalledModels(allowed);
       setModel((current) => allowed.includes(current) ? current : (allowed[0] ?? current));
       if (result.reachable && allowed.length === 0) {
-        setError("Ollama is running, but neither supported model is installed. In Terminal, run: ollama pull llama3.2:3b");
+        setError("Ollama is running, but neither supported model is installed. In Terminal, run: ollama pull llama3.2:1b (fast) or ollama pull llama3.2:3b (balanced)");
       } else if (!result.reachable) {
         setError("Ollama is not reachable from the PromptLab server at 127.0.0.1:11434. This works by default in local development when PromptLab and Ollama run on the same machine. A hosted deployment needs a trusted, privately reachable OLLAMA_BASE_URL; do not expose Ollama directly to the public internet.");
       } else {
@@ -98,6 +116,33 @@ export function LocalVoiceTest() {
   useEffect(() => {
     void refreshModels();
   }, [refreshModels]);
+
+  useEffect(() => {
+    if (!("speechSynthesis" in window)) return;
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices().slice().sort((a, b) => {
+        const priority = (voice: SpeechSynthesisVoice) =>
+          /^en-IN$/i.test(voice.lang) ? 0 :
+          /^en-(GB|AU)$/i.test(voice.lang) ? 1 :
+          /^en-US$/i.test(voice.lang) ? 2 :
+          /^en/i.test(voice.lang) ? 3 : 4;
+        return priority(a) - priority(b) || a.name.localeCompare(b.name);
+      });
+      setAvailableVoices(voices);
+      setSelectedVoiceURI((current) => {
+        if (current && voices.some((voice) => voice.voiceURI === current)) return current;
+        return voices.find((voice) => /^en-IN$/i.test(voice.lang))?.voiceURI
+          ?? voices.find((voice) => /^en-(GB|AU)$/i.test(voice.lang))?.voiceURI
+          ?? voices.find((voice) => /^en-US$/i.test(voice.lang))?.voiceURI
+          ?? voices.find((voice) => /^en/i.test(voice.lang))?.voiceURI
+          ?? voices[0]?.voiceURI
+          ?? "";
+      });
+    };
+    loadVoices();
+    window.speechSynthesis.addEventListener("voiceschanged", loadVoices);
+    return () => window.speechSynthesis.removeEventListener("voiceschanged", loadVoices);
+  }, []);
 
   const pushEvent = (type: string, detail: string) => {
     const now = performance.now();
@@ -125,6 +170,65 @@ export function LocalVoiceTest() {
     }
   };
 
+  speakNextRef.current = () => {
+    if (speakingRef.current) return;
+    const nextText = speechQueueRef.current.shift();
+    if (!nextText) {
+      if (speechStreamCompleteRef.current) {
+        processingRef.current = false;
+        setStatus(voiceActiveRef.current ? "listening" : "idle");
+        scheduleRecognitionRestart();
+      }
+      return;
+    }
+    if (!("speechSynthesis" in window)) return;
+    const utterance = new SpeechSynthesisUtterance(nextText);
+    const voice = availableVoices.find((candidate) => candidate.voiceURI === selectedVoiceURI)
+      ?? availableVoices.find((candidate) => /^en-IN$/i.test(candidate.lang))
+      ?? availableVoices.find((candidate) => /^en/i.test(candidate.lang));
+    if (voice) {
+      utterance.voice = voice;
+      utterance.lang = voice.lang;
+    } else {
+      utterance.lang = "en-IN";
+    }
+    utterance.rate = speechRate;
+    utterance.pitch = 1;
+    speakingRef.current = true;
+    setStatus("speaking");
+    utterance.onend = () => {
+      speakingRef.current = false;
+      pushEvent("browser.speech_chunk_finished", "A spoken response segment finished");
+      if (speechQueueRef.current.length > 0) {
+        speakNextRef.current?.();
+      } else if (speechStreamCompleteRef.current) {
+        processingRef.current = false;
+        setStatus(voiceActiveRef.current ? "listening" : "idle");
+        scheduleRecognitionRestart();
+      } else {
+        setStatus("thinking");
+      }
+    };
+    utterance.onerror = () => {
+      speakingRef.current = false;
+      if (voiceActiveRef.current) setError("Speech playback failed; the written reply remains available.");
+      if (speechQueueRef.current.length > 0) speakNextRef.current?.();
+      else if (speechStreamCompleteRef.current) {
+        processingRef.current = false;
+        setStatus(voiceActiveRef.current ? "listening" : "idle");
+        scheduleRecognitionRestart();
+      }
+    };
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const queueSpeech = (phrase: string) => {
+    const cleaned = phrase.replace(/[*_#]/g, "").replace(/\s+/g, " ").trim();
+    if (!cleaned) return;
+    speechQueueRef.current.push(cleaned);
+    speakNextRef.current?.();
+  };
+
   const stopVoice = () => {
     voiceActiveRef.current = false;
     setVoiceActive(false);
@@ -135,6 +239,8 @@ export function LocalVoiceTest() {
     try { recognizerRef.current?.abort(); } catch { /* recognizer already stopped */ }
     recognizerRef.current = null;
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    speechQueueRef.current = [];
+    speechStreamCompleteRef.current = false;
     setStatus("idle");
     pushEvent("local_voice.stopped", "Microphone listening and speech playback stopped");
   };
@@ -148,8 +254,12 @@ export function LocalVoiceTest() {
     }
     processingRef.current = true;
     const started = performance.now();
+    let firstTokenLatencyMs: number | null = null;
+    let speechBuffer = "";
+    speechQueueRef.current = [];
+    speechStreamCompleteRef.current = false;
     const callerMessage: ChatMessage = { id: ++sequenceRef.current, role: "user", content: text };
-    const recent = [...messages, callerMessage].slice(-18);
+    const recent = [...messages, callerMessage].slice(-8);
     setMessages((previous) => [...previous, callerMessage].slice(-20));
     setError("");
     setStatus("thinking");
@@ -158,43 +268,115 @@ export function LocalVoiceTest() {
       : "Text sent to the local voice agent");
 
     try {
-      const result = await runLocalChat({
-        data: {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session?.access_token) {
+        throw new Error("Your session expired. Sign in again before using the local voice agent.");
+      }
+      const response = await fetch("/api/local-voice-stream", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + sessionData.session.access_token,
+        },
+        body: JSON.stringify({
           model,
           instructions,
           messages: recent.map(({ role, content }) => ({ role, content })),
-        },
+        }),
       });
-      const reply = result.content.trim();
-      const assistantMessage: ChatMessage = { id: ++sequenceRef.current, role: "assistant", content: reply };
-      setMessages((previous) => [...previous, assistantMessage].slice(-20));
-      const latency = Math.round(performance.now() - started);
-      setLastLatencyMs(latency);
-      pushEvent("ollama.response_received", "Local model response returned in " + latency + " ms");
+      if (!response.ok) {
+        let message = "Local voice request failed with HTTP " + response.status;
+        try {
+          const payload = await response.json() as { error?: string };
+          if (payload.error) message = payload.error;
+        } catch { /* use status message */ }
+        throw new Error(message);
+      }
+      if (!response.body) throw new Error("Streaming is not available in this browser.");
+
+      const assistantId = ++sequenceRef.current;
+      setMessages((previous) => [...previous, { id: assistantId, role: "assistant" as const, content: "" }].slice(-20));
+      let reply = "";
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let carry = "";
+      let streamDone = false;
+
+      const addText = (delta: string) => {
+        if (!delta) return;
+        if (firstTokenLatencyMs === null) {
+          firstTokenLatencyMs = Math.round(performance.now() - started);
+          setLastLatencyMs(firstTokenLatencyMs);
+          pushEvent("ollama.first_token", "First response token received in " + firstTokenLatencyMs + " ms");
+        }
+        reply += delta;
+        setMessages((previous) => previous.map((message) =>
+          message.id === assistantId ? { ...message, content: reply } : message,
+        ));
+        if (fromVoice && voiceActiveRef.current && "speechSynthesis" in window) {
+          speechBuffer += delta;
+          const sentenceEnd = /[.!?](?:\s+|$)/g;
+          let end = 0;
+          let match: RegExpExecArray | null;
+          while ((match = sentenceEnd.exec(speechBuffer)) !== null) {
+            const finish = sentenceEnd.lastIndex;
+            const phrase = speechBuffer.slice(end, match.index + 1).trim();
+            if (phrase) queueSpeech(phrase);
+            end = finish;
+          }
+          if (end > 0) speechBuffer = speechBuffer.slice(end).trimStart();
+          if (speechBuffer.length > 150) {
+            const splitAt = Math.max(speechBuffer.lastIndexOf(", ", 135), speechBuffer.lastIndexOf(" ", 135));
+            if (splitAt > 50) {
+              queueSpeech(speechBuffer.slice(0, splitAt));
+              speechBuffer = speechBuffer.slice(splitAt).trimStart();
+            }
+          }
+        }
+      };
+
+      while (!streamDone) {
+        const { value, done } = await reader.read();
+        carry += decoder.decode(value, { stream: !done });
+        const lines = carry.split("\n");
+        carry = lines.pop() ?? "";
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          let chunk: { message?: { content?: string }; done?: boolean; error?: string };
+          try {
+            chunk = JSON.parse(trimmed) as typeof chunk;
+          } catch {
+            continue;
+          }
+          if (chunk.error) throw new Error(chunk.error);
+          if (typeof chunk.message?.content === "string") addText(chunk.message.content);
+        }
+        if (done) {
+          if (carry.trim()) {
+            try {
+              const finalChunk = JSON.parse(carry) as { message?: { content?: string }; error?: string };
+              if (finalChunk.error) throw new Error(finalChunk.error);
+              if (typeof finalChunk.message?.content === "string") addText(finalChunk.message.content);
+            } catch (cause) {
+              if (cause instanceof Error && cause.message !== "Unexpected end of JSON input") throw cause;
+            }
+          }
+          streamDone = true;
+        }
+      }
+
+      if (!reply.trim()) throw new Error("Ollama returned an empty response. Try again or select another local model.");
+      const fullLatency = Math.round(performance.now() - started);
+      setLastLatencyMs(firstTokenLatencyMs ?? fullLatency);
+      pushEvent("ollama.response_received", "Full response generated in " + fullLatency + " ms");
 
       if (fromVoice && voiceActiveRef.current && "speechSynthesis" in window) {
-        speakingRef.current = true;
-        setStatus("speaking");
-        const utterance = new SpeechSynthesisUtterance(reply);
-        const voices = window.speechSynthesis.getVoices();
-        const preferredVoice = voices.find((candidate) => candidate.lang.toLowerCase() === "en-in")
-          ?? voices.find((candidate) => candidate.lang.toLowerCase().startsWith("en"));
-        if (preferredVoice) utterance.voice = preferredVoice;
-        utterance.onend = () => {
-          speakingRef.current = false;
-          processingRef.current = false;
-          pushEvent("browser.speech_output_finished", "System/browser speech synthesis finished");
-          scheduleRecognitionRestart();
-        };
-        utterance.onerror = () => {
-          speakingRef.current = false;
-          processingRef.current = false;
-          if (voiceActiveRef.current) setError("Speech playback failed; the text reply is still available below.");
-          scheduleRecognitionRestart();
-        };
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(utterance);
+        if (speechBuffer.trim()) queueSpeech(speechBuffer);
+        speechStreamCompleteRef.current = true;
+        speakNextRef.current?.();
       } else {
+        speechStreamCompleteRef.current = true;
         processingRef.current = false;
         setStatus(voiceActiveRef.current ? "listening" : "idle");
         scheduleRecognitionRestart();
@@ -203,6 +385,7 @@ export function LocalVoiceTest() {
       const message = cause instanceof Error ? cause.message : "Local voice request failed.";
       setError(message);
       pushEvent("ollama.request_failed", message);
+      speechStreamCompleteRef.current = true;
       processingRef.current = false;
       setStatus(voiceActiveRef.current ? "listening" : "idle");
       scheduleRecognitionRestart();
@@ -219,7 +402,7 @@ export function LocalVoiceTest() {
       return;
     }
     if (!installedModels.includes(model)) {
-      setError("No selected local model is installed. Refresh the model list or install Llama 3.2 3B in Terminal.");
+      setError("No selected local model is installed. Refresh the list, or install llama3.2:1b for speed or llama3.2:3b for a stronger small model.");
       return;
     }
     try {
@@ -310,6 +493,59 @@ export function LocalVoiceTest() {
             <span className="block text-xs font-normal text-muted-foreground">{instructions.length}/5000 characters. These instructions are used for local-mode replies only.</span>
           </label>
 
+          <div className="grid gap-4 rounded-xl border border-border/70 bg-muted/20 p-4 sm:grid-cols-[minmax(0,1fr)_220px]">
+            <label className="space-y-1.5 text-sm font-medium">Spoken voice
+              <select
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm font-normal"
+                value={selectedVoiceURI}
+                onChange={(event) => setSelectedVoiceURI(event.target.value)}
+                disabled={voiceActive}
+              >
+                {availableVoices.length === 0 ? <option value="">Use system default voice</option> : availableVoices.map((voice) => (
+                  <option key={voice.voiceURI} value={voice.voiceURI}>{voice.name} · {voice.lang}{voice.default ? " · system default" : ""}</option>
+                ))}
+              </select>
+              <span className="block text-xs font-normal text-muted-foreground">Voice quality depends on voices installed in macOS and exposed by Chrome. An English India voice is preferred when available.</span>
+            </label>
+            <label className="space-y-2 text-sm font-medium">Speaking rate <span className="text-muted-foreground tabular-nums">{speechRate.toFixed(2)}×</span>
+              <input
+                type="range"
+                className="block w-full accent-emerald-600"
+                min="0.85"
+                max="1.15"
+                step="0.05"
+                value={speechRate}
+                onChange={(event) => setSpeechRate(Number(event.target.value))}
+                disabled={voiceActive}
+              />
+              <span className="block text-xs font-normal text-muted-foreground">Adjust pace for clarity and shorter playback time.</span>
+            </label>
+            <div className="flex items-center">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (!("speechSynthesis" in window)) return;
+                  window.speechSynthesis.cancel();
+                  const preview = new SpeechSynthesisUtterance("Hello, I'm your voice agent. How can I help you today?");
+                  const voice = availableVoices.find((candidate) => candidate.voiceURI === selectedVoiceURI);
+                  if (voice) {
+                    preview.voice = voice;
+                    preview.lang = voice.lang;
+                  } else {
+                    preview.lang = "en-IN";
+                  }
+                  preview.rate = speechRate;
+                  preview.pitch = 1;
+                  window.speechSynthesis.speak(preview);
+                }}
+                disabled={voiceActive || availableVoices.length === 0}
+              >
+                <Volume2 className="mr-2 h-4 w-4" /> Preview voice
+              </Button>
+            </div>
+          </div>
           <div className="flex flex-wrap items-center gap-3">
             {voiceActive ? (
               <Button type="button" variant="destructive" onClick={stopVoice}><MicOff className="mr-2 h-4 w-4" /> Stop microphone</Button>
@@ -317,7 +553,7 @@ export function LocalVoiceTest() {
               <Button type="button" onClick={startVoice} disabled={!installedModels.includes(model) || status === "thinking" || status === "speaking"}><Mic className="mr-2 h-4 w-4" /> Start voice conversation</Button>
             )}
             <span className="rounded-md bg-muted px-3 py-2 text-sm">Status: <strong>{STATUS_LABELS[status]}</strong></span>
-            {lastLatencyMs !== null && <span className="text-sm text-muted-foreground">Local model round trip: <strong className="text-foreground tabular-nums">{lastLatencyMs} ms</strong></span>}
+            {lastLatencyMs !== null && <span className="text-sm text-muted-foreground">Time to first token: <strong className="text-foreground tabular-nums">{lastLatencyMs} ms</strong></span>}
           </div>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         </CardContent>

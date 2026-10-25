@@ -4,6 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { callModel } from "@/lib/playground.functions";
 
 const LOCAL_MODELS = [
+  { id: "ollama/llama3.2:1b", ollamaName: "llama3.2:1b", label: "Llama 3.2 1B (fast local)" },
   { id: "ollama/llama3.2:3b", ollamaName: "llama3.2:3b", label: "Llama 3.2 3B (local)" },
   { id: "ollama/qwen3:4b", ollamaName: "qwen3:4b", label: "Qwen3 4B (local)" },
 ] as const;

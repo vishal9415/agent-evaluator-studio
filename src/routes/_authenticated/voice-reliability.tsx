@@ -12,12 +12,13 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LiveRealtimeTest } from "@/components/voice-reliability/LiveRealtimeTest";
 import { LocalVoiceTest } from "@/components/voice-reliability/LocalVoiceTest";
+import { LiveAudioDiagnostics } from "@/components/voice-reliability/LiveAudioDiagnostics";
 
 export const Route = createFileRoute("/_authenticated/voice-reliability")({
   head: () => ({
     meta: [
-      { title: "Voice Reliability Lab — PromptLab" },
-      { name: "description", content: "Compare hosted OpenAI Realtime with local Ollama-assisted voice testing." },
+      { title: "Live Voice Reliability Studio — PromptLab" },
+      { name: "description", content: "Inspect microphone audio quality, request browser noise suppression and measure live input signals before agent integration." },
     ],
   }),
   component: VoiceReliabilityPage,
@@ -32,9 +33,9 @@ function VoiceReliabilityPage() {
         <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300"><AudioLines className="h-4 w-4" /> Voice test workspace <span className="text-slate-600">/</span> Lab 02</p>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Voice Reliability Lab</h1>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Live Voice Reliability Studio</h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base sm:leading-7">
-              Trace the conversation from microphone input to agent response. Switch between a hosted realtime pipeline and a local-model path, then inspect the events each mode exposes.
+              Start with the microphone signal: inspect input level, clipping hints and browser audio-processing settings. Then run a hosted or local agent conversation and inspect the events each pipeline exposes.
             </p>
           </div>
           <div className="flex w-fit shrink-0 items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.06] px-3.5 py-3 text-xs text-slate-200 backdrop-blur-sm">
@@ -49,6 +50,8 @@ function VoiceReliabilityPage() {
           <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/10 px-3 py-1.5 text-[11px] text-slate-300"><ShieldCheck className="h-3.5 w-3.5 text-emerald-300" /> Session-aware diagnostics</span>
         </div>
       </header>
+
+      <LiveAudioDiagnostics />
 
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_310px]">
         <section className="min-w-0 space-y-4" aria-label="Voice test controls">
