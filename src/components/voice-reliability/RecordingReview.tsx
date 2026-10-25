@@ -80,9 +80,11 @@ function normalizeLine(value: string) {
     .replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
 }
 
-function roleOf(line: string): "agent" | "caller" | null {
+function roleOf(line: string): string | null {
   if (/^\s*(agent|assistant|bot)\s*[:\-]/i.test(line)) return "agent";
   if (/^\s*(caller|customer|user)\s*[:\-]/i.test(line)) return "caller";
+  const genericSpeaker = line.match(/^\s*speaker\s*([a-z0-9_-]+)\s*[:\-]/i);
+  if (genericSpeaker) return "speaker:" + genericSpeaker[1].toLowerCase();
   return null;
 }
 
@@ -424,6 +426,54 @@ export function RecordingReview() {
     setBusyId(null);
   }
 
+  async function transcribeAndAnalyze(recording: Recording) {
+    if (busyId) return;
+    if (recording.transcript.trim() && !window.confirm("Replace the existing transcript with a new speaker-diarized transcription?")) return;
+
+    setBusyId(recording.id);
+    setUploadMessage("");
+    try {
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !data.session?.access_token) {
+        throw new Error("Your sign-in session is unavailable. Sign in again and retry.");
+      }
+
+      const form = new FormData();
+      form.append("file", recording.file, recording.file.name);
+      const response = await fetch("/api/recording-transcribe", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + data.session.access_token },
+        body: form,
+      });
+
+      const result = await response.json().catch(() => ({})) as {
+        transcript?: string;
+        languageCode?: string | null;
+        diarized?: boolean;
+        error?: string;
+      };
+      if (!response.ok || !result.transcript) {
+        throw new Error(result.error || "Could not transcribe this recording.");
+      }
+
+      const nextTranscript = result.transcript.slice(0, 50000);
+      patchRecording(recording.id, {
+        transcript: nextTranscript,
+        status: "ready",
+        findings: [],
+        metrics: null,
+      });
+      toast.success(result.diarized ? "Transcription completed with speaker labels." : "Transcription completed.");
+      await analyzeRecording({ ...recording, transcript: nextTranscript });
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Transcription failed. Please retry.";
+      patchRecording(recording.id, { status: recording.metrics ? "complete" : "ready" });
+      toast.error(message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function analyzeAll() {
     for (const recording of recordings) {
       await analyzeRecording(recording);
@@ -516,9 +566,13 @@ export function RecordingReview() {
                     </div>
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-2">
+                    <Button variant="outline" size="sm" onClick={() => void transcribeAndAnalyze(recording)} disabled={busyId !== null}>
+                      {busyId === recording.id ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <AudioLines className="mr-2 h-4 w-4" />}
+                      Transcribe & analyze
+                    </Button>
                     <Button variant="outline" size="sm" onClick={() => void analyzeRecording(recording)} disabled={busyId !== null}>
-                      {busyId === recording.id ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                      Analyze recording
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Quick checks
                     </Button>
                     <Button variant="ghost" size="icon" aria-label={"Remove " + recording.file.name} onClick={() => removeRecording(recording.id)} disabled={busyId !== null}>
                       <Trash2 className="h-4 w-4" />
