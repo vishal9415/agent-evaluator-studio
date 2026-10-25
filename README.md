@@ -55,6 +55,12 @@ The authenticated app contains:
 The Voice Reliability Lab connects to OpenAI Realtime through server-side SDP negotiation. It persists session metadata and event timing only; raw audio and transcript text are not stored. A browser-observed speech-stop-to-response-created gap is not provider processing latency or time-to-audible response.
 
 
+### Existing recording review
+
+The Voice Reliability Studio includes a client-side **Recording Review** section before the Design Partner workspace. Users can add up to 10 audio files per batch (maximum 25 MB per file and 100 MB total), play them back, and run local signal checks for possible clipping, low average level, and long low-level segments. Files are held in the current browser session and are not stored by PromptLab.
+
+For optional transcription, **Transcribe & analyze** explicitly sends that selected recording to the ElevenLabs Speech-to-Text API (`scribe_v2`) with speaker diarization enabled. This can consume ElevenLabs usage. The resulting transcript remains in page memory and is checked for potential repeated questions/utterances, unclear-transcription markers and long turns. PromptLab does not persist the uploaded audio or transcript. Only use recordings you are authorized to process, and review the transcription provider's data-handling terms. Manual quick checks and audio signal metrics do not use an AI inference endpoint. Findings are heuristic flags for human review, not a verified quality score. The workflow does not yet do full semantic grounding analysis, compare a call against a known target prompt, or automatically save reports.
+
 ### Existing voice-agent integration (Vapi pilot)
 
 The authenticated **Integrations** page can create a Vapi webhook secret and show the endpoint for the currently deployed environment. In Vapi, open the existing assistant, set **Advanced → Webhook Server → Server URL** to the endpoint, add the custom HTTP header `X-PromptLab-Secret` with the generated secret, enable `end-of-call-report` under Server Messages, and publish the assistant settings. Vapi supports server URLs and custom HTTP headers in its webhook configuration: https://docs.vapi.ai/server-url/setting-server-urls.
