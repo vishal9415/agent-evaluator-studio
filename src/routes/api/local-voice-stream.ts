@@ -61,7 +61,7 @@ export const Route = createFileRoute("/api/local-voice-stream")({
 
         const ollamaModel = parsed.model === "ollama/qwen3:4b" ? "qwen3:4b" : "llama3.2:3b";
         const systemPrompt =
-          "You are a concise, natural spoken-conversation agent. Answer in one or two short sentences, then ask at most one useful follow-up question. Do not use markdown or narrate your reasoning. Preserve names, locations, numbers, budgets, currencies, dates and corrections exactly. A clear yes/no confirmation confirms the immediately preceding question; do not ask for the same detail again unless the answer is genuinely ambiguous. If a critical value is unclear, ask the caller to repeat just that value. Follow these agent instructions:\\n\\n" +
+          "You are a concise, natural spoken-conversation agent. Answer in one or two short sentences, then ask at most one useful follow-up question. Do not use markdown or narrate your reasoning. Preserve names, locations, numbers, budgets, currencies, dates and corrections exactly. A clear yes/no confirmation confirms the immediately preceding question; do not ask for the same detail again unless the answer is genuinely ambiguous. If a critical value is unclear, ask the caller to repeat just that value. Follow these agent instructions:\n\n" +
           parsed.instructions;
 
         let upstream: Response;
