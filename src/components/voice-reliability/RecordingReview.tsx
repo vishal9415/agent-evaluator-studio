@@ -525,6 +525,9 @@ export function RecordingReview() {
         status: "ready",
         findings: [],
         metrics: null,
+        promptEvaluation: null,
+        promptEvalStatus: "idle",
+        promptEvalError: null,
       });
       toast.success(result.diarized ? "Transcription completed with speaker labels." : "Transcription completed.");
       await analyzeRecording({ ...recording, transcript: nextTranscript }, true);
@@ -537,16 +540,16 @@ export function RecordingReview() {
     }
   }
 
-  async function runPromptEvaluation(recording: Recording, allowBusy = false, promptOverride = promptText) {
+  async function runPromptEvaluation(recording: Recording, allowBusy = false, promptOverride = promptText): Promise<boolean> {
     const activePrompt = promptOverride.trim();
-    if (busyId && !allowBusy) return;
+    if (busyId && !allowBusy) return false;
     if (activePrompt.length < 20) {
       toast.error("Choose a saved prompt or paste the production prompt first.");
-      return;
+      return false;
     }
     if (recording.transcript.trim().length < 20) {
       toast.error("Add a transcript or use Transcribe & analyze before checking this call against the prompt.");
-      return;
+      return false;
     }
 
     setBusyId(recording.id);
@@ -557,10 +560,12 @@ export function RecordingReview() {
       }) as PromptEvaluation;
       patchRecording(recording.id, { promptEvaluation: result, promptEvalStatus: "complete", promptEvalError: null });
       toast.success("Prompt-aware review completed for " + recording.file.name);
+      return true;
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Prompt-aware review failed.";
       patchRecording(recording.id, { promptEvalStatus: "error", promptEvalError: message });
       toast.error(message);
+      return false;
     } finally {
       setBusyId(null);
     }
@@ -584,7 +589,8 @@ export function RecordingReview() {
     setPromptBatchRunning(true);
     try {
       for (const recording of eligible) {
-        await runPromptEvaluation(recording, true, activePrompt);
+        const succeeded = await runPromptEvaluation(recording, true, activePrompt);
+        if (!succeeded) break;
       }
     } finally {
       setPromptBatchRunning(false);
