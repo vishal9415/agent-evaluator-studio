@@ -12,12 +12,12 @@ import { realtimeRequestSchema } from "./openai-realtime.schema";
 export const createOpenAIRealtimeAnswer = createServerFn({ method: "POST" })
   .inputValidator((input) => realtimeRequestSchema.parse(input))
   .handler(async ({ data }) => {
-    const supabaseUrl = process.env.PROMPTLAB_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
-    const supabasePublishableKey = process.env.PROMPTLAB_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    const supabaseUrl = process.env.PROMPTLAB_SUPABASE_URL;
+    const supabasePublishableKey = process.env.PROMPTLAB_SUPABASE_PUBLISHABLE_KEY;
     const openAiApiKey = process.env.OPENAI_API_KEY;
 
     if (!supabaseUrl || !supabasePublishableKey) {
-      throw new Error("Supabase server configuration is missing.");
+      throw new Error("Missing server environment variables: PROMPTLAB_SUPABASE_URL and/or PROMPTLAB_SUPABASE_PUBLISHABLE_KEY. Lovable must expose these custom PromptLab secrets to the server runtime.");
     }
     if (!openAiApiKey) {
       throw new Error("OPENAI_API_KEY is not configured on the server.");
