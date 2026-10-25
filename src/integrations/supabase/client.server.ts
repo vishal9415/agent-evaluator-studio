@@ -7,15 +7,15 @@ import type { Database } from './types';
 
 function createSupabaseAdminClient() {
   // Prefer the same project URL used by the browser; keep the service-role key server-only.
-  const SUPABASE_URL = process.env.PROMPTLAB_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
+  const SUPABASE_URL = process.env.PROMPTLAB_SUPABASE_URL;
   const SUPABASE_SERVICE_ROLE_KEY = process.env.PROMPTLAB_SUPABASE_SERVICE_ROLE_KEY;
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     const missing = [
-      ...(!SUPABASE_URL ? ['PROMPTLAB_SUPABASE_URL (or VITE_SUPABASE_URL for local development)'] : []),
+      ...(!SUPABASE_URL ? ['PROMPTLAB_SUPABASE_URL'] : []),
       ...(!SUPABASE_SERVICE_ROLE_KEY ? ['PROMPTLAB_SUPABASE_SERVICE_ROLE_KEY'] : []),
     ];
-    const message = `Missing Supabase environment variable(s): ${missing.join(', ')}. Configure PromptLab's external Supabase connection and server-only key.`;
+    const message = `Missing server environment variable(s): ${missing.join(', ')}. Lovable must expose these custom PromptLab secrets to the server runtime.`;
     console.error(`[Supabase] ${message}`);
     throw new Error(message);
   }
