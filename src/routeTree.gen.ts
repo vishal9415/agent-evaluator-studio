@@ -15,6 +15,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedGuardrailsRouteImport } from './routes/_authenticated/guardrails'
 import { Route as AuthenticatedPlaygroundRouteImport } from './routes/_authenticated/playground'
 import { Route as AuthenticatedVoiceReliabilityRouteImport } from './routes/_authenticated/voice-reliability'
+import { Route as ApiLocalVoiceStreamRouteImport } from './routes/api/local-voice-stream'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -45,6 +46,11 @@ const AuthenticatedVoiceReliabilityRoute = AuthenticatedVoiceReliabilityRouteImp
   path: '/voice-reliability',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiLocalVoiceStreamRoute = ApiLocalVoiceStreamRouteImport.update({
+  id: '/api/local-voice-stream',
+  path: '/api/local-voice-stream',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -52,6 +58,7 @@ export interface FileRoutesByFullPath {
   '/guardrails': typeof AuthenticatedGuardrailsRoute
   '/playground': typeof AuthenticatedPlaygroundRoute
   '/voice-reliability': typeof AuthenticatedVoiceReliabilityRoute
+  '/api/local-voice-stream': typeof ApiLocalVoiceStreamRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByTo {
   '/guardrails': typeof AuthenticatedGuardrailsRoute
   '/playground': typeof AuthenticatedPlaygroundRoute
   '/voice-reliability': typeof AuthenticatedVoiceReliabilityRoute
+  '/api/local-voice-stream': typeof ApiLocalVoiceStreamRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -68,10 +76,11 @@ export interface FileRoutesById {
   '/_authenticated/guardrails': typeof AuthenticatedGuardrailsRoute
   '/_authenticated/playground': typeof AuthenticatedPlaygroundRoute
   '/_authenticated/voice-reliability': typeof AuthenticatedVoiceReliabilityRoute
+  '/api/local-voice-stream': typeof ApiLocalVoiceStreamRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/guardrails' | '/playground' | '/voice-reliability'
+  fullPaths: '/' | '/auth' | '/guardrails' | '/playground' | '/voice-reliability' | '/api/local-voice-stream'
   fileRoutesByTo: FileRoutesByTo
   to: '/' | '/auth' | '/guardrails' | '/playground' | '/voice-reliability'
   id:
@@ -82,12 +91,14 @@ export interface FileRouteTypes {
     | '/_authenticated/guardrails'
     | '/_authenticated/playground'
     | '/_authenticated/voice-reliability'
+    | '/api/local-voice-stream'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiLocalVoiceStreamRoute: typeof ApiLocalVoiceStreamRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -134,6 +145,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedVoiceReliabilityRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/local-voice-stream': {
+      id: '/api/local-voice-stream'
+      path: '/api/local-voice-stream'
+      fullPath: '/api/local-voice-stream'
+      preLoaderRoute: typeof ApiLocalVoiceStreamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -156,6 +174,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiLocalVoiceStreamRoute: ApiLocalVoiceStreamRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
