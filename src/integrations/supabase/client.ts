@@ -4,10 +4,12 @@ import type { Database } from './types';
 import { brokeredPreviewStorage } from './previewAuthStorage';
 
 function createSupabaseClient() {
-  // Use import.meta.env for client-side (Vite build-time replacement)
-  // Fall back to process.env for SSR (server-side rendering)
-  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
+  // Pin browser authentication to PromptLab's external Supabase project. Lovable may
+  // inject its own VITE_SUPABASE_* values for the managed backend; using those would
+  // issue a token that the PromptLab server correctly rejects. Both values below
+  // are public browser configuration (never put the service-role key here).
+  const SUPABASE_URL = import.meta.env.VITE_PROMPTLAB_SUPABASE_URL || "https://qqkubrluqysfalysrzpn.supabase.co";
+  const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_PROMPTLAB_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_ofGOorIj8r0_X3NK9KQ-PQ_D7tQb0Z_";
 
   if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
     const missing = [
