@@ -60,9 +60,46 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
       }
     );
 
+    // Diagnostic only: inspect the untrusted issuer claim to detect a project mismatch.
+    // The token is still cryptographically verified by getClaims below before any
+    // identity is trusted. Never log or return the access token itself.
+    let tokenIssuerHost: string | null = null;
+    try {
+      const payloadPart = token.split('.')[1];
+      if (payloadPart) {
+        const payloadJson = atob(payloadPart.replace(/-/g, '+').replace(/_/g, '/'));
+        const payload = JSON.parse(payloadJson) as { iss?: unknown };
+        if (typeof payload.iss === 'string') {
+          tokenIssuerHost = new URL(payload.iss).hostname;
+        }
+      }
+    } catch {
+      // A malformed token will be rejected by getClaims below.
+    }
+
+    let configuredHost: string | null = null;
+    try {
+      configuredHost = new URL(SUPABASE_URL).hostname;
+    } catch {
+      throw new Error('Supabase server URL is invalid.');
+    }
+
+    if (tokenIssuerHost && configuredHost && tokenIssuerHost !== configuredHost) {
+      throw new Error('Unauthorized: Token belongs to a different Supabase project. The browser and server configurations do not match.');
+    }
+
     const { data, error } = await supabase.auth.getClaims(token);
     if (error || !data?.claims) {
-      throw new Error('Unauthorized: Invalid token');
+      const validationCode = error && 'code' in error && typeof error.code === 'string'
+        ? error.code
+        : 'verification_failed';
+      console.error('[Supabase Auth] Access token verification failed', {
+        code: validationCode,
+        message: error?.message ?? 'No claims returned',
+        tokenIssuerHost,
+        configuredHost,
+      });
+      throw new Error(`Unauthorized: Supabase could not verify the access token (${validationCode}). Check the project configuration and sign-in session.`);
     }
 
     if (!data.claims.sub) {
