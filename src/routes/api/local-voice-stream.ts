@@ -13,8 +13,8 @@ const requestSchema = z.object({
 
 function ollamaRoot(): string {
   return (process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434/v1")
-    .replace(/\\/+$/, "")
-    .replace(/\\/v1$/, "");
+    .replace(/\/+$/, "")
+    .replace(/\/v1$/, "");
 }
 
 function jsonError(message: string, status: number): Response {
