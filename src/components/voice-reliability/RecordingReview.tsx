@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { supabase } from "@/integrations/supabase/client";
 
 const MAX_FILES = 10;
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
@@ -101,7 +102,10 @@ function analyzeTranscript(transcript: string): Finding[] {
     });
   }
 
-  const agentLines = lines.filter((line) => roleOf(line) === "agent");
+  const agentLines = lines.filter((line) => {
+    const role = roleOf(line);
+    return role === "agent" || role?.startsWith("speaker:") === true;
+  });
   const labelledLines = lines.filter((line) => roleOf(line) !== null);
   if (labelledLines.length === 0) {
     findings.push({
@@ -124,7 +128,7 @@ function analyzeTranscript(transcript: string): Finding[] {
         id: "repeated-agent-question",
         level: "medium",
         area: "Conversation transcript",
-        title: "Possible repeated agent question",
+        title: "Possible repeated question from the same agent/speaker",
         detail: `Found ${repeatedQuestions.length} question wording(s) repeated by the agent. Check whether the caller had already answered or corrected the detail.`,
       });
     }
@@ -135,8 +139,8 @@ function analyzeTranscript(transcript: string): Finding[] {
         id: "long-agent-turn",
         level: "medium",
         area: "Conversation transcript",
-        title: "Very long agent turn",
-        detail: `Found ${longAgentLines.length} agent turn(s) over 110 words. Review whether the agent is monologuing instead of using shorter, natural turns.`,
+        title: "Very long agent/speaker turn",
+        detail: `Found ${longAgentLines.length} agent turn(s) over 110 words. Review whether the speaker is monologuing instead of using shorter, natural turns.`,
       });
     }
 
@@ -439,7 +443,7 @@ export function RecordingReview() {
           </p>
           <h2 id="recording-review-heading" className="mt-1.5 text-xl font-semibold tracking-tight">Review existing recordings</h2>
           <p className="mt-1 text-sm leading-6 text-muted-foreground">
-            Add up to 10 call recordings, inspect audio-signal warnings, and run quick transcript checks where text is available.
+            Add up to 10 call recordings, inspect audio-signal warnings, or transcribe with speaker labels to check call dialogue.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -479,7 +483,7 @@ export function RecordingReview() {
       <div className="flex items-start gap-2 rounded-xl border border-sky-500/20 bg-sky-500/[0.04] p-3.5">
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-sky-700 dark:text-sky-300" />
         <div className="text-xs leading-5 text-muted-foreground">
-          <span className="font-semibold text-foreground">Privacy-first, no API credits required.</span> Audio files are decoded in this browser and are not uploaded or stored. Audio checks flag possible clipping, low signal and long low-level segments. Conversation checks use simple rules on a transcript you paste; automatic speech-to-text and deep semantic scoring are not included in this first version.
+          <span className="font-semibold text-foreground">Local checks are free; transcription is optional.</span> Audio signal checks run in this browser and do not upload the file. If you click “Transcribe & analyze”, that recording is sent to ElevenLabs Scribe for speech-to-text and speaker diarization and may consume your ElevenLabs usage. PromptLab does not save the raw recording or transcript to its database. Only transcribe recordings you are authorized to process; provider data handling is subject to your ElevenLabs account terms.
         </div>
       </div>
 
