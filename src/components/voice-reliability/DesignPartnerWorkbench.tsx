@@ -10,6 +10,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { saveDesignPartnerReport } from "@/lib/design-partner.functions";
+import { DesignPartnerInbox } from "@/components/voice-reliability/DesignPartnerInbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -153,6 +154,8 @@ export function DesignPartnerWorkbench() {
           <span><strong className="tabular-nums">{counts.notTested}</strong> untested</span>
         </div>
       </div>
+
+      <DesignPartnerInbox />
 
       <div className="grid gap-4 xl:grid-cols-2">
         {CASES.map((testCase, index) => {
