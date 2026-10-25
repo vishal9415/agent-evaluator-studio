@@ -142,7 +142,7 @@ function analyzeTranscript(transcript: string): Finding[] {
         level: "medium",
         area: "Conversation transcript",
         title: "Very long agent/speaker turn",
-        detail: `Found ${longAgentLines.length} agent turn(s) over 110 words. Review whether the speaker is monologuing instead of using shorter, natural turns.`,
+        detail: `Found ${longAgentLines.length} agent/speaker turn(s) over 110 words. Review whether the speaker is monologuing instead of using shorter, natural turns.`,
       });
     }
 
