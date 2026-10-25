@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LiveRealtimeTest } from "@/components/voice-reliability/LiveRealtimeTest";
 import { LocalVoiceTest } from "@/components/voice-reliability/LocalVoiceTest";
 import { LiveAudioDiagnostics } from "@/components/voice-reliability/LiveAudioDiagnostics";
+import { DesignPartnerWorkbench } from "@/components/voice-reliability/DesignPartnerWorkbench";
 
 export const Route = createFileRoute("/_authenticated/voice-reliability")({
   head: () => ({
@@ -119,6 +120,8 @@ function VoiceReliabilityPage() {
           </section>
         </aside>
       </div>
+      <DesignPartnerWorkbench />
+
     </main>
   );
 }
