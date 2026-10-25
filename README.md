@@ -27,8 +27,8 @@ cp .env.example .env
 
 Fill in the values in `.env` from your own Supabase, Lovable AI Gateway, and OpenAI accounts. The template uses placeholders only. Keep `.env` local; do not commit it or paste server secrets into client-visible `VITE_*` variables.
 
-- `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`: Supabase project configuration.
-- `SUPABASE_SERVICE_ROLE_KEY`: server-only Supabase key required by existing admin data functions. Never expose it to browser code.
+- `PROMPTLAB_SUPABASE_URL` and `PROMPTLAB_SUPABASE_PUBLISHABLE_KEY`: server-side configuration for the same external Supabase project used by the browser. The browser uses `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` for that same project.
+- `PROMPTLAB_SUPABASE_SERVICE_ROLE_KEY`: server-only key required by admin data functions. Never expose it to browser code. In Lovable, use these `PROMPTLAB_*` names because the platform reserves `SUPABASE_*` variables for its own backend.
 - `LOVABLE_API_KEY`: server-only key used by existing text evaluation/scenario-generation flows.
 - `OPENAI_API_KEY`: server-only key used to negotiate OpenAI Realtime voice sessions.
 - `PROMPTLAB_ADMIN_USER_IDS`: comma-separated Supabase Auth user UUIDs allowed to grant pilot test-seconds in the current single-user/admin allowlist model.
