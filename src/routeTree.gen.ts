@@ -82,7 +82,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths: '/' | '/auth' | '/guardrails' | '/playground' | '/voice-reliability' | '/api/local-voice-stream'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/guardrails' | '/playground' | '/voice-reliability'
+  to: '/' | '/auth' | '/guardrails' | '/playground' | '/voice-reliability' | '/api/local-voice-stream'
   id:
     | '__root__'
     | '/'
