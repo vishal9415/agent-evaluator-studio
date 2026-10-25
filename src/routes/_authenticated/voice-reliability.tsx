@@ -14,6 +14,7 @@ import { LiveRealtimeTest } from "@/components/voice-reliability/LiveRealtimeTes
 import { LocalVoiceTest } from "@/components/voice-reliability/LocalVoiceTest";
 import { LiveAudioDiagnostics } from "@/components/voice-reliability/LiveAudioDiagnostics";
 import { DesignPartnerWorkbench } from "@/components/voice-reliability/DesignPartnerWorkbench";
+import { RecordingReview } from "@/components/voice-reliability/RecordingReview";
 
 export const Route = createFileRoute("/_authenticated/voice-reliability")({
   head: () => ({
@@ -120,6 +121,7 @@ function VoiceReliabilityPage() {
           </section>
         </aside>
       </div>
+      <RecordingReview />
       <DesignPartnerWorkbench />
 
     </main>
