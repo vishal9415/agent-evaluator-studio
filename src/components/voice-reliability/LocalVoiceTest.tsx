@@ -520,6 +520,31 @@ export function LocalVoiceTest() {
               />
               <span className="block text-xs font-normal text-muted-foreground">Adjust pace for clarity and shorter playback time.</span>
             </label>
+            <div className="flex items-center">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (!("speechSynthesis" in window)) return;
+                  window.speechSynthesis.cancel();
+                  const preview = new SpeechSynthesisUtterance("Hello, I'm your voice agent. How can I help you today?");
+                  const voice = availableVoices.find((candidate) => candidate.voiceURI === selectedVoiceURI);
+                  if (voice) {
+                    preview.voice = voice;
+                    preview.lang = voice.lang;
+                  } else {
+                    preview.lang = "en-IN";
+                  }
+                  preview.rate = speechRate;
+                  preview.pitch = 1;
+                  window.speechSynthesis.speak(preview);
+                }}
+                disabled={voiceActive || availableVoices.length === 0}
+              >
+                <Volume2 className="mr-2 h-4 w-4" /> Preview voice
+              </Button>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             {voiceActive ? (
