@@ -85,7 +85,6 @@ export const Route = createFileRoute("/api/vapi-webhook")({
         const artifact = pickRecord(message.artifact, call.artifact, payload.artifact);
         const analysis = pickRecord(message.analysis, call.analysis, payload.analysis);
 
-        const { createHash } = await import("node:crypto");
         const secretHash = createHash("sha256").update(providedSecret, "utf8").digest("hex");
 
         let db: any;
