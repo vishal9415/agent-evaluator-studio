@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedGuardrailsRouteImport } from './routes/_authenticated/guardrails'
+import { Route as AuthenticatedIntegrationsRouteImport } from './routes/_authenticated/integrations'
 import { Route as AuthenticatedPlaygroundRouteImport } from './routes/_authenticated/playground'
 import { Route as AuthenticatedVoiceReliabilityRouteImport } from './routes/_authenticated/voice-reliability'
 import { Route as ApiLocalVoiceStreamRouteImport } from './routes/api/local-voice-stream'
@@ -30,6 +31,11 @@ const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedIntegrationsRoute = AuthenticatedIntegrationsRouteImport.update({
+  id: '/_authenticated/integrations',
+  path: '/integrations',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedGuardrailsRoute = AuthenticatedGuardrailsRouteImport.update({
   id: '/guardrails',
@@ -56,6 +62,8 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/guardrails': typeof AuthenticatedGuardrailsRoute
+  '/integrations': typeof AuthenticatedIntegrationsRoute
+  '/integrations': typeof AuthenticatedIntegrationsRoute
   '/playground': typeof AuthenticatedPlaygroundRoute
   '/voice-reliability': typeof AuthenticatedVoiceReliabilityRoute
   '/api/local-voice-stream': typeof ApiLocalVoiceStreamRoute
@@ -74,21 +82,23 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/guardrails': typeof AuthenticatedGuardrailsRoute
+  '/_authenticated/integrations': typeof AuthenticatedIntegrationsRoute
   '/_authenticated/playground': typeof AuthenticatedPlaygroundRoute
   '/_authenticated/voice-reliability': typeof AuthenticatedVoiceReliabilityRoute
   '/api/local-voice-stream': typeof ApiLocalVoiceStreamRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/guardrails' | '/playground' | '/voice-reliability' | '/api/local-voice-stream'
+  fullPaths: '/' | '/auth' | '/guardrails' | '/integrations' | '/playground' | '/voice-reliability' | '/api/local-voice-stream'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/guardrails' | '/playground' | '/voice-reliability' | '/api/local-voice-stream'
+  to: '/' | '/auth' | '/guardrails' | '/integrations' | '/playground' | '/voice-reliability' | '/api/local-voice-stream'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/guardrails'
+    | '/_authenticated/integrations'
     | '/_authenticated/playground'
     | '/_authenticated/voice-reliability'
     | '/api/local-voice-stream'
@@ -124,6 +134,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/integrations': {
+      id: '/_authenticated/integrations'
+      path: '/integrations'
+      fullPath: '/integrations'
+      preLoaderRoute: typeof AuthenticatedIntegrationsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/guardrails': {
       id: '/_authenticated/guardrails'
       path: '/guardrails'
@@ -156,12 +173,14 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedIntegrationsRoute: typeof AuthenticatedIntegrationsRoute
   AuthenticatedGuardrailsRoute: typeof AuthenticatedGuardrailsRoute
   AuthenticatedPlaygroundRoute: typeof AuthenticatedPlaygroundRoute
   AuthenticatedVoiceReliabilityRoute: typeof AuthenticatedVoiceReliabilityRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedIntegrationsRoute: AuthenticatedIntegrationsRoute,
   AuthenticatedGuardrailsRoute: AuthenticatedGuardrailsRoute,
   AuthenticatedPlaygroundRoute: AuthenticatedPlaygroundRoute,
   AuthenticatedVoiceReliabilityRoute: AuthenticatedVoiceReliabilityRoute,
