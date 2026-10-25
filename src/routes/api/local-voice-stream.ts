@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 const requestSchema = z.object({
-  model: z.enum(["ollama/llama3.2:3b", "ollama/qwen3:4b"]),
+  model: z.enum(["ollama/llama3.2:1b", "ollama/llama3.2:3b", "ollama/qwen3:4b"]),
   instructions: z.string().trim().min(1).max(5000),
   messages: z.array(z.object({
     role: z.enum(["user", "assistant"]),
@@ -59,7 +59,7 @@ export const Route = createFileRoute("/api/local-voice-stream")({
           return jsonError("Invalid local voice request. Keep the prompt under 5,000 characters and send up to 8 recent messages.", 400);
         }
 
-        const ollamaModel = parsed.model === "ollama/qwen3:4b" ? "qwen3:4b" : "llama3.2:3b";
+        const ollamaModel = parsed.model === "ollama/qwen3:4b" ? "qwen3:4b" : parsed.model === "ollama/llama3.2:1b" ? "llama3.2:1b" : "llama3.2:3b";
         const systemPrompt =
           "You are a concise, natural spoken-conversation agent. Answer in one or two short sentences, then ask at most one useful follow-up question. Do not use markdown or narrate your reasoning. Preserve names, locations, numbers, budgets, currencies, dates and corrections exactly. A clear yes/no confirmation confirms the immediately preceding question; do not ask for the same detail again unless the answer is genuinely ambiguous. If a critical value is unclear, ask the caller to repeat just that value. Follow these agent instructions:\n\n" +
           parsed.instructions;
