@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   AlertCircle,
   AudioLines,
-  CheckCircle2,
   ClipboardPaste,
   FileAudio,
   FileText,
@@ -13,7 +12,6 @@ import {
   ShieldCheck,
   Trash2,
   Upload,
-  Volume2,
   Waves,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -54,7 +52,6 @@ type Recording = {
   status: ReviewStatus;
   metrics: AudioMetrics | null;
   findings: Finding[];
-  note: string;
 };
 
 function makeId() {
@@ -324,6 +321,10 @@ export function RecordingReview() {
         errors.push(file.name + ": unsupported file type.");
         continue;
       }
+      if (file.size === 0) {
+        errors.push(file.name + ": file is empty.");
+        continue;
+      }
       if (file.size > MAX_FILE_BYTES) {
         errors.push(file.name + ": exceeds the 25 MB per-file limit.");
         continue;
@@ -351,7 +352,6 @@ export function RecordingReview() {
         status: "ready",
         metrics: null,
         findings: [],
-        note: "",
       });
     }
 
@@ -373,7 +373,7 @@ export function RecordingReview() {
   async function analyzeRecording(recording: Recording) {
     if (busyId) return;
     setBusyId(recording.id);
-    patchRecording(recording.id, { status: "analyzing", findings: [], metrics: null, note: "" });
+    patchRecording(recording.id, { status: "analyzing", findings: [], metrics: null });
     const findings: Finding[] = [];
     let metrics: AudioMetrics | null = null;
     let signalUnavailable = false;
@@ -416,7 +416,6 @@ export function RecordingReview() {
       metrics,
       findings,
       status: signalUnavailable ? "signal-unavailable" : "complete",
-      note: "",
     });
     setBusyId(null);
   }
