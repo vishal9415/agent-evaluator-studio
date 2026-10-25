@@ -85,7 +85,11 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
     }
 
     if (tokenIssuerHost && configuredHost && tokenIssuerHost !== configuredHost) {
-      throw new Error('Unauthorized: Token belongs to a different Supabase project. The browser and server configurations do not match.');
+      // These hostnames are project identifiers, not credentials. Showing them
+      // helps resolve a project mismatch without exposing the bearer token or keys.
+      throw new Error(
+        `Unauthorized: Supabase project mismatch. Token issuer: ${tokenIssuerHost}; server configured for: ${configuredHost}.`
+      );
     }
 
     const { data, error } = await supabase.auth.getClaims(token);
