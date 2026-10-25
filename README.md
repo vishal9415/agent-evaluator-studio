@@ -50,8 +50,18 @@ npm run dev
 The authenticated app contains:
 - `/playground` — existing prompt editing, manual chat, automated evaluations, comparisons, guardrails, and voice-platform export.
 - `/voice-reliability` — first live OpenAI Realtime WebRTC test path, available after sign-in and server configuration.
+- `/integrations` — Vapi completed-call webhook setup and recent imported call history.
 
 The Voice Reliability Lab connects to OpenAI Realtime through server-side SDP negotiation. It persists session metadata and event timing only; raw audio and transcript text are not stored. A browser-observed speech-stop-to-response-created gap is not provider processing latency or time-to-audible response.
+
+
+### Existing voice-agent integration (Vapi pilot)
+
+The authenticated **Integrations** page can create a Vapi webhook secret and show the endpoint for the currently deployed environment. In Vapi, open the existing assistant, set **Advanced → Webhook Server → Server URL** to the endpoint, add the custom HTTP header `X-PromptLab-Secret` with the generated secret, enable `end-of-call-report` under Server Messages, and publish the assistant settings. Vapi supports server URLs and custom HTTP headers in its webhook configuration: https://docs.vapi.ai/server-url/setting-server-urls.
+
+The public `POST /api/vapi-webhook` receiver hashes and checks the shared secret, then upserts completed-call metadata by integration and provider call ID so duplicate deliveries do not duplicate calls. Phone numbers, recording URLs, and raw webhook bodies are not stored. Transcript text, call summaries, and selected analysis fields are retained only when the integration owner explicitly enables content retention. Rotating the webhook secret invalidates the previous secret; update the Vapi header immediately after rotation.
+
+This is a **post-call pilot integration**, not a real-time audio connector. It does not yet pull historical calls from Vapi, calculate PromptLab quality scores, run automated call scoring, or intervene while a call is in progress. Calls arrive after the webhook is configured and Vapi delivers an event. Apply `supabase/migrations/20261025135000_vapi_call_ingestion.sql` to the target PromptLab Supabase project (already applied to the current pilot project).
 
 ### Free local models with Ollama
 
