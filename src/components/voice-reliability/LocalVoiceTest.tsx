@@ -294,7 +294,7 @@ export function LocalVoiceTest() {
       if (!response.body) throw new Error("Streaming is not available in this browser.");
 
       const assistantId = ++sequenceRef.current;
-      setMessages((previous) => [...previous, { id: assistantId, role: "assistant", content: "" }].slice(-20));
+      setMessages((previous) => [...previous, { id: assistantId, role: "assistant" as const, content: "" }].slice(-20));
       let reply = "";
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
