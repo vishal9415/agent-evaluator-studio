@@ -109,3 +109,30 @@ Still not implemented: workspace membership/role management, fully repeatable li
 ## Validation
 
 `bun run typecheck`, `bun run test`, targeted ESLint, and `bun run build` are the intended pull-request checks. The CI workflow uses placeholder environment values for build-only validation; it does not prove connectivity to Supabase or OpenAI. Run a manual live-session test with your own configuration before treating the voice adapter as provider-verified.
+
+## Design-partner pilot
+
+The Voice Reliability Studio includes a **Reliability casebook & feedback** section for a small design-partner pilot. Partners can run the same seven synthetic cases across sessions, mark each as passed / needs work / not tested, rate the experience, and submit categorized feedback. Reports are associated with the signed-in account. The stored report contains case IDs/statuses, rating, category, execution mode, optional notes, and optional consent to follow up; it does not accept raw audio, transcripts, prompt bodies, or provider event payloads. Ask pilot participants not to paste real customer data or secrets into feedback.
+
+### Enable pilot feedback storage
+
+Apply the new migration `supabase/migrations/20261025090000_design_partner_reports.sql` **after** the existing migrations. For a remote development database, verify the linked project is the intended pilot project and review the dry run before pushing:
+
+```sh
+supabase migration list
+supabase db push --dry-run
+# Confirm the project/ref and migration list, then:
+supabase db push
+```
+
+The server-side `SUPABASE_SERVICE_ROLE_KEY` must be configured in the deployment's secret manager because existing server functions use it for owner-scoped writes. Never expose it through a `VITE_*` variable or ask a design partner to supply it. Row-level security limits reads/deletes to a user's own report; server submissions derive the owner from the verified sign-in token.
+
+### Suggested pilot setup
+
+- Invite only a few named participants and ask each to use their own account. Confirm sign-up/sign-in works on the deployed URL before sharing it.
+- For hosted voice testing, configure a valid server-side `OPENAI_API_KEY` and check the OpenAI account has enabled billing/credits. OpenAI usage is billed separately from PromptLab's internal pilot test-seconds.
+- Grant a small internal pilot allowance to each test account using the existing Usage panel and the configured admin-user allowlist. The allowance is a session cap in seconds, not a USD balance.
+- Ask partners to run at least the critical-field, correction-wins, confirmation, and unsupported-claim cases. Their case outcomes are human-reviewed observations; they are not automated acoustic benchmarks or a safety certification.
+- On a hosted deployment, the **Local Ollama** tab connects from the application server, not the partner's own Mac. Use it only when Ollama is intentionally running and reachable from that server. Do not expose a partner's local Ollama port to the public internet to work around this.
+
+No new model training is required for this pilot. There is not yet a validated, consented dataset of representative failures to train or fine-tune a model responsibly; the casebook is a structured way to start collecting early product feedback without storing call recordings/transcripts.
