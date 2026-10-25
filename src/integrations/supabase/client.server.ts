@@ -7,15 +7,15 @@ import type { Database } from './types';
 
 function createSupabaseAdminClient() {
   // Prefer the same project URL used by the browser; keep the service-role key server-only.
-  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const SUPABASE_URL = process.env.PROMPTLAB_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
+  const SUPABASE_SERVICE_ROLE_KEY = process.env.PROMPTLAB_SUPABASE_SERVICE_ROLE_KEY;
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     const missing = [
-      ...(!SUPABASE_URL ? ['SUPABASE_URL'] : []),
-      ...(!SUPABASE_SERVICE_ROLE_KEY ? ['SUPABASE_SERVICE_ROLE_KEY'] : []),
+      ...(!SUPABASE_URL ? ['PROMPTLAB_SUPABASE_URL (or VITE_SUPABASE_URL for local development)'] : []),
+      ...(!SUPABASE_SERVICE_ROLE_KEY ? ['PROMPTLAB_SUPABASE_SERVICE_ROLE_KEY'] : []),
     ];
-    const message = `Missing Supabase environment variable(s): ${missing.join(', ')}. Connect Supabase in Lovable Cloud.`;
+    const message = `Missing Supabase environment variable(s): ${missing.join(', ')}. Configure PromptLab's external Supabase connection and server-only key.`;
     console.error(`[Supabase] ${message}`);
     throw new Error(message);
   }
