@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { listLocalVoiceModels } from "@/lib/local-voice.functions";
 
-type LocalModel = "ollama/llama3.2:3b" | "ollama/qwen3:4b";
+type LocalModel = "ollama/llama3.2:1b" | "ollama/llama3.2:3b" | "ollama/qwen3:4b";
 type ChatMessage = { role: "user" | "assistant"; content: string; id: number };
 type LocalEvent = { id: number; elapsedMs: number; type: string; detail: string };
 type RecognitionAlternativeLike = { transcript: string };
@@ -34,7 +34,8 @@ type SpeechWindow = Window & {
 };
 
 const MODEL_OPTIONS: Array<{ value: LocalModel; label: string }> = [
-  { value: "ollama/llama3.2:3b", label: "Llama 3.2 3B" },
+  { value: "ollama/llama3.2:1b", label: "Llama 3.2 1B · fastest, lower accuracy" },
+  { value: "ollama/llama3.2:3b", label: "Llama 3.2 3B · balanced" },
   { value: "ollama/qwen3:4b", label: "Qwen3 4B" },
 ];
 
@@ -97,7 +98,7 @@ export function LocalVoiceTest() {
       setInstalledModels(allowed);
       setModel((current) => allowed.includes(current) ? current : (allowed[0] ?? current));
       if (result.reachable && allowed.length === 0) {
-        setError("Ollama is running, but neither supported model is installed. In Terminal, run: ollama pull llama3.2:3b");
+        setError("Ollama is running, but neither supported model is installed. In Terminal, run: ollama pull llama3.2:1b (fast) or ollama pull llama3.2:3b (balanced)");
       } else if (!result.reachable) {
         setError("Ollama is not reachable from the PromptLab server at 127.0.0.1:11434. This works by default in local development when PromptLab and Ollama run on the same machine. A hosted deployment needs a trusted, privately reachable OLLAMA_BASE_URL; do not expose Ollama directly to the public internet.");
       } else {
@@ -400,7 +401,7 @@ export function LocalVoiceTest() {
       return;
     }
     if (!installedModels.includes(model)) {
-      setError("No selected local model is installed. Refresh the model list or install Llama 3.2 3B in Terminal.");
+      setError("No selected local model is installed. Refresh the list, or install llama3.2:1b for speed or llama3.2:3b for a stronger small model.");
       return;
     }
     try {
