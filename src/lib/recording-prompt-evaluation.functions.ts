@@ -5,7 +5,7 @@ import { callModel } from "@/lib/playground.functions";
 
 const inputSchema = z.object({
   prompt: z.string().trim().min(20).max(20000),
-  transcript: z.string().trim().min(20).max(45000),
+  transcript: z.string().trim().min(20).max(50000),
   recordingName: z.string().trim().min(1).max(240),
 });
 
