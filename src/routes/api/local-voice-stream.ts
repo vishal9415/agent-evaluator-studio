@@ -30,10 +30,10 @@ export const Route = createFileRoute("/api/local-voice-stream")({
           return jsonError("Please sign in before using the local voice agent.", 401);
         }
 
-        const supabaseUrl = process.env.SUPABASE_URL;
-        const supabaseKey = process.env.SUPABASE_PUBLISHABLE_KEY;
+        const supabaseUrl = process.env.PROMPTLAB_SUPABASE_URL;
+        const supabaseKey = process.env.PROMPTLAB_SUPABASE_PUBLISHABLE_KEY;
         if (!supabaseUrl || !supabaseKey) {
-          return jsonError("Supabase authentication is not configured on this server.", 503);
+          return jsonError("PromptLab Supabase authentication is not configured on this server. Add PROMPTLAB_SUPABASE_URL and PROMPTLAB_SUPABASE_PUBLISHABLE_KEY.", 503);
         }
 
         const token = authorization.slice("Bearer ".length).trim();
