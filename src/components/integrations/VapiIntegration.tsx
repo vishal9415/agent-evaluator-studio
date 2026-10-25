@@ -3,9 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   Activity,
   AlertCircle,
-  ArrowUpRight,
   Check,
-  CheckCircle2,
   CircleHelp,
   Clipboard,
   Clock3,
@@ -332,7 +330,7 @@ export function VapiIntegration() {
                   </div>
                   <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
                     <div className="rounded-lg bg-muted/40 p-2.5"><span className="block text-muted-foreground">Assistant</span><span className="mt-1 block break-all font-medium">{call.assistantId || "Unknown"}</span></div>
-                    <div className="rounded-lg bg-muted/40 p-2.5"><span className="block text-muted-foreground">Call cost</span><span className="mt-1 block font-medium">{call.cost === null ? "Not supplied" : call.cost.toFixed(4)}</span></div>
+                    <div className="rounded-lg bg-muted/40 p-2.5"><span className="block text-muted-foreground">Call cost (USD)</span><span className="mt-1 block font-medium">{call.cost === null ? "Not supplied" : "$" + call.cost.toFixed(4)}</span></div>
                     <div className="rounded-lg bg-muted/40 p-2.5"><span className="block text-muted-foreground">End reason</span><span className="mt-1 block break-words font-medium">{call.endedReason || "Not supplied"}</span></div>
                   </div>
                   {call.summary && <details className="mt-3 rounded-lg border border-border bg-muted/20 p-3"><summary className="cursor-pointer text-xs font-medium">Call summary</summary><p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-muted-foreground">{call.summary}</p></details>}
