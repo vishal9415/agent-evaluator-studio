@@ -72,7 +72,7 @@ type PromptEvaluation = {
   evaluatedAt: string;
   promptFingerprint: string;
 };
-type SavedPrompt = { id: string; name: string; system_prompt: string; model: string; agent_type: string };
+type SavedPrompt = { id: string; name: string; system_prompt: string; model: string; agent_type: string; begin_message?: string; stages?: Array<{ name: string; prompt: string; transitions?: Array<{ target?: string; condition?: string }> }> };
 
 type Recording = {
   id: string;
@@ -559,7 +559,7 @@ export function RecordingReview() {
         data: { prompt: activePrompt, transcript: recording.transcript.trim(), recordingName: recording.file.name },
       }) as PromptEvaluation;
       patchRecording(recording.id, { promptEvaluation: result, promptEvalStatus: "complete", promptEvalError: null });
-      toast.success("Prompt-aware review completed for " + recording.file.name);
+      if (!allowBusy) toast.success("Prompt-aware review completed for " + recording.file.name);
       return true;
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Prompt-aware review failed.";
@@ -587,14 +587,17 @@ export function RecordingReview() {
     if (!window.confirm("This will send " + eligible.length + " transcript(s) and the selected prompt to the hosted AI evaluator. It may consume Lovable AI gateway credits. Continue?" + extra)) return;
 
     setPromptBatchRunning(true);
+    let completedCount = 0;
     try {
       for (const recording of eligible) {
         const succeeded = await runPromptEvaluation(recording, true, activePrompt);
         if (!succeeded) break;
+        completedCount += 1;
       }
     } finally {
       setPromptBatchRunning(false);
       setBusyId(null);
+      if (completedCount > 0) toast.success("Prompt-aware evaluation completed for " + completedCount + " of " + eligible.length + " recording(s).");
     }
   }
 
@@ -657,7 +660,19 @@ export function RecordingReview() {
                 setSelectedSavedPromptId(id);
                 if (id) {
                   const selected = savedPrompts.find((item) => item.id === id);
-                  if (selected) setPromptText(selected.system_prompt);
+                  if (selected) {
+                    const sections = [selected.system_prompt.trim()];
+                    if (selected.begin_message?.trim()) sections.push("Opening message:\\n" + selected.begin_message.trim());
+                    if (Array.isArray(selected.stages) && selected.stages.length) {
+                      sections.push("Conversation stages:\\n" + selected.stages.map((stage) =>
+                        "Stage: " + (stage.name || "Unnamed") + "\\n" + (stage.prompt || "")
+                          + ((stage.transitions ?? []).length ? "\\nTransitions: " + stage.transitions.map((transition) => [transition.target, transition.condition].filter(Boolean).join(": ")).join("; ") : "")
+                      ).join("\\n\\n"));
+                    }
+                    const combined = sections.filter(Boolean).join("\\n\\n");
+                    if (combined.length > 20000) toast.warning("Saved prompt is longer than the 20,000-character review limit. The loaded prompt was truncated; verify it before evaluating.");
+                    setPromptText(combined.slice(0, 20000));
+                  }
                 }
               }}
               disabled={busyId !== null}
