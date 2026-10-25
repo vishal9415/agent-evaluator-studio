@@ -17,6 +17,7 @@ import { Route as AuthenticatedIntegrationsRouteImport } from './routes/_authent
 import { Route as AuthenticatedPlaygroundRouteImport } from './routes/_authenticated/playground'
 import { Route as AuthenticatedVoiceReliabilityRouteImport } from './routes/_authenticated/voice-reliability'
 import { Route as ApiLocalVoiceStreamRouteImport } from './routes/api/local-voice-stream'
+import { Route as ApiRecordingTranscribeRouteImport } from './routes/api/recording-transcribe'
 import { Route as ApiVapiWebhookRouteImport } from './routes/api/vapi-webhook'
 
 const IndexRoute = IndexRouteImport.update({
@@ -58,6 +59,11 @@ const ApiLocalVoiceStreamRoute = ApiLocalVoiceStreamRouteImport.update({
   path: '/api/local-voice-stream',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiRecordingTranscribeRoute = ApiRecordingTranscribeRouteImport.update({
+  id: '/api/recording-transcribe',
+  path: '/api/recording-transcribe',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiVapiWebhookRoute = ApiVapiWebhookRouteImport.update({
   id: '/api/vapi-webhook',
   path: '/api/vapi-webhook',
@@ -72,6 +78,7 @@ export interface FileRoutesByFullPath {
   '/playground': typeof AuthenticatedPlaygroundRoute
   '/voice-reliability': typeof AuthenticatedVoiceReliabilityRoute
   '/api/local-voice-stream': typeof ApiLocalVoiceStreamRoute
+  '/api/recording-transcribe': typeof ApiRecordingTranscribeRoute
   '/api/vapi-webhook': typeof ApiVapiWebhookRoute
 }
 export interface FileRoutesByTo {
@@ -82,6 +89,7 @@ export interface FileRoutesByTo {
   '/playground': typeof AuthenticatedPlaygroundRoute
   '/voice-reliability': typeof AuthenticatedVoiceReliabilityRoute
   '/api/local-voice-stream': typeof ApiLocalVoiceStreamRoute
+  '/api/recording-transcribe': typeof ApiRecordingTranscribeRoute
   '/api/vapi-webhook': typeof ApiVapiWebhookRoute
 }
 export interface FileRoutesById {
@@ -94,13 +102,14 @@ export interface FileRoutesById {
   '/_authenticated/playground': typeof AuthenticatedPlaygroundRoute
   '/_authenticated/voice-reliability': typeof AuthenticatedVoiceReliabilityRoute
   '/api/local-voice-stream': typeof ApiLocalVoiceStreamRoute
+  '/api/recording-transcribe': typeof ApiRecordingTranscribeRoute
   '/api/vapi-webhook': typeof ApiVapiWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/guardrails' | '/integrations' | '/playground' | '/voice-reliability' | '/api/local-voice-stream' | '/api/vapi-webhook'
+  fullPaths: '/' | '/auth' | '/guardrails' | '/integrations' | '/playground' | '/voice-reliability' | '/api/local-voice-stream' | '/api/recording-transcribe' | '/api/vapi-webhook'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/guardrails' | '/integrations' | '/playground' | '/voice-reliability' | '/api/local-voice-stream' | '/api/vapi-webhook'
+  to: '/' | '/auth' | '/guardrails' | '/integrations' | '/playground' | '/voice-reliability' | '/api/local-voice-stream' | '/api/recording-transcribe' | '/api/vapi-webhook'
   id:
     | '__root__'
     | '/'
@@ -111,6 +120,7 @@ export interface FileRouteTypes {
     | '/_authenticated/playground'
     | '/_authenticated/voice-reliability'
     | '/api/local-voice-stream'
+    | '/api/recording-transcribe'
     | '/api/vapi-webhook'
   fileRoutesById: FileRoutesById
 }
@@ -119,6 +129,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ApiLocalVoiceStreamRoute: typeof ApiLocalVoiceStreamRoute
+  ApiRecordingTranscribeRoute: typeof ApiRecordingTranscribeRoute
   ApiVapiWebhookRoute: typeof ApiVapiWebhookRoute
 }
 
@@ -180,6 +191,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiLocalVoiceStreamRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/recording-transcribe': {
+      id: '/api/recording-transcribe'
+      path: '/api/recording-transcribe'
+      fullPath: '/api/recording-transcribe'
+      preLoaderRoute: typeof ApiRecordingTranscribeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/vapi-webhook': {
       id: '/api/vapi-webhook'
       path: '/api/vapi-webhook'
@@ -212,6 +230,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ApiLocalVoiceStreamRoute: ApiLocalVoiceStreamRoute,
+  ApiRecordingTranscribeRoute: ApiRecordingTranscribeRoute,
   ApiVapiWebhookRoute: ApiVapiWebhookRoute,
 }
 export const routeTree = rootRouteImport
