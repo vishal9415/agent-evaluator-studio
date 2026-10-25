@@ -662,14 +662,14 @@ export function RecordingReview() {
                   const selected = savedPrompts.find((item) => item.id === id);
                   if (selected) {
                     const sections = [selected.system_prompt.trim()];
-                    if (selected.begin_message?.trim()) sections.push("Opening message:\\n" + selected.begin_message.trim());
+                    if (selected.begin_message?.trim()) sections.push("Opening message:\n" + selected.begin_message.trim());
                     if (Array.isArray(selected.stages) && selected.stages.length) {
-                      sections.push("Conversation stages:\\n" + selected.stages.map((stage) =>
-                        "Stage: " + (stage.name || "Unnamed") + "\\n" + (stage.prompt || "")
-                          + ((stage.transitions ?? []).length ? "\\nTransitions: " + stage.transitions.map((transition) => [transition.target, transition.condition].filter(Boolean).join(": ")).join("; ") : "")
-                      ).join("\\n\\n"));
+                      sections.push("Conversation stages:\n" + selected.stages.map((stage) =>
+                        "Stage: " + (stage.name || "Unnamed") + "\n" + (stage.prompt || "")
+                          + ((stage.transitions ?? []).length ? "\nTransitions: " + stage.transitions.map((transition) => [transition.target, transition.condition].filter(Boolean).join(": ")).join("; ") : "")
+                      ).join("\n\n"));
                     }
-                    const combined = sections.filter(Boolean).join("\\n\\n");
+                    const combined = sections.filter(Boolean).join("\n\n");
                     if (combined.length > 20000) toast.warning("Saved prompt is longer than the 20,000-character review limit. The loaded prompt was truncated; verify it before evaluating.");
                     setPromptText(combined.slice(0, 20000));
                   }
