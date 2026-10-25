@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      design_partner_reports: {
+        Row: {
+          id: string
+          user_id: string
+          report_kind: string
+          overall_rating: number
+          category: string
+          execution_mode: string
+          notes: string
+          case_results: Json
+          contact_ok: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          report_kind?: string
+          overall_rating: number
+          category: string
+          execution_mode: string
+          notes?: string
+          case_results?: Json
+          contact_ok?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          report_kind?: string
+          overall_rating?: number
+          category?: string
+          execution_mode?: string
+          notes?: string
+          case_results?: Json
+          contact_ok?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
       evaluations: {
         Row: {
           agent_type: string
