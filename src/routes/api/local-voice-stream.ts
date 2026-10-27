@@ -5,7 +5,7 @@ import { z } from "zod";
 const requestSchema = z.object({
   model: z.enum(["ollama/llama3.2:1b", "ollama/llama3.2:3b", "ollama/qwen3:4b"]),
   instructions: z.string().trim().min(1).max(5000),
-  responseLanguage: z.string().trim().min(2).max(40).optional(),
+  responseLanguage: z.enum(["Assamese", "Bengali", "English", "Gujarati", "Hindi", "Kannada", "Malayalam", "Marathi", "Odia", "Punjabi", "Tamil", "Telugu"]).optional(),
   messages: z.array(z.object({
     role: z.enum(["user", "assistant"]),
     content: z.string().trim().min(1).max(4000),
