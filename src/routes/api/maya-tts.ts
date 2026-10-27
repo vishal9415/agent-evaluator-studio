@@ -3,6 +3,10 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 const PUBLIC_SPACE_BASE = "https://hugging-apps-maya2-native.hf.space";
+// The publishable key is intentionally public and matches the browser client fallback.
+// This lets the Maya demo work in Lovable without requiring duplicate server secrets.
+const DEFAULT_PROMPTLAB_SUPABASE_URL = "https://qqkubrluqysfalysrzpn.supabase.co";
+const DEFAULT_PROMPTLAB_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_ofGOorIj8r0_X3NK9KQ-PQ_D7tQb0Z_";
 const languageCodes = ["as", "bn", "en", "gu", "hi", "kn", "ml", "mr", "or", "pa", "ta", "te"] as const;
 const voiceNames = [
   "Ahana", "Vaidehi", "Malini", "Charvi", "Jahnavi", "Anirban", "Nakul", "Vasant",
@@ -42,9 +46,12 @@ async function authenticate(request: Request): Promise<{ userId: string } | Resp
   const token = authorization.slice("Bearer ".length).trim();
   if (!token) return jsonError("Missing authentication token.", 401);
 
-  const supabaseUrl = process.env.PROMPTLAB_SUPABASE_URL;
-  const publishableKey = process.env.PROMPTLAB_SUPABASE_PUBLISHABLE_KEY;
-  if (!supabaseUrl || !publishableKey) return jsonError("PromptLab Supabase server authentication is not configured.", 503);
+  const supabaseUrl = process.env.PROMPTLAB_SUPABASE_URL?.trim()
+    || process.env.VITE_PROMPTLAB_SUPABASE_URL?.trim()
+    || DEFAULT_PROMPTLAB_SUPABASE_URL;
+  const publishableKey = process.env.PROMPTLAB_SUPABASE_PUBLISHABLE_KEY?.trim()
+    || process.env.VITE_PROMPTLAB_SUPABASE_PUBLISHABLE_KEY?.trim()
+    || DEFAULT_PROMPTLAB_SUPABASE_PUBLISHABLE_KEY;
 
   try {
     const supabase = createClient(supabaseUrl, publishableKey, {
