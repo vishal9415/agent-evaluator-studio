@@ -5,6 +5,7 @@ import { z } from "zod";
 const requestSchema = z.object({
   model: z.enum(["ollama/llama3.2:1b", "ollama/llama3.2:3b", "ollama/qwen3:4b"]),
   instructions: z.string().trim().min(1).max(5000),
+  responseLanguage: z.string().trim().min(2).max(40).optional(),
   messages: z.array(z.object({
     role: z.enum(["user", "assistant"]),
     content: z.string().trim().min(1).max(4000),
@@ -62,7 +63,8 @@ export const Route = createFileRoute("/api/local-voice-stream")({
         const ollamaModel = parsed.model === "ollama/qwen3:4b" ? "qwen3:4b" : parsed.model === "ollama/llama3.2:1b" ? "llama3.2:1b" : "llama3.2:3b";
         const systemPrompt =
           "You are a concise, natural spoken-conversation agent. Answer in one or two short sentences, then ask at most one useful follow-up question. Do not use markdown or narrate your reasoning. Preserve names, locations, numbers, budgets, currencies, dates and corrections exactly. A clear yes/no confirmation confirms the immediately preceding question; do not ask for the same detail again unless the answer is genuinely ambiguous. If a critical value is unclear, ask the caller to repeat just that value. Follow these agent instructions:\n\n" +
-          parsed.instructions;
+          parsed.instructions +
+          (parsed.responseLanguage ? "\n\nRespond in " + parsed.responseLanguage + " unless the caller explicitly asks to use another language." : "");
 
         let upstream: Response;
         try {
