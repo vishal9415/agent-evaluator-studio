@@ -92,7 +92,7 @@ export function LocalVoiceTest() {
   const [selectedVoiceURI, setSelectedVoiceURI] = useState("");
   const [speechRate, setSpeechRate] = useState(1);
   const [speechEngine, setSpeechEngine] = useState<SpeechEngine>("browser");
-  const [mayaLanguage, setMayaLanguage] = useState<MayaLanguage>("hi");
+  const [mayaLanguage, setMayaLanguage] = useState<MayaLanguage>("en");
   const [mayaVoice, setMayaVoice] = useState<MayaVoice>("Ahana");
   const [mayaServerReady, setMayaServerReady] = useState<boolean | null>(null);
   const [mayaServerMessage, setMayaServerMessage] = useState("Maya server status not checked.");
@@ -411,6 +411,9 @@ export function LocalVoiceTest() {
         body: JSON.stringify({
           model,
           instructions,
+          responseLanguage: speechEngine === "maya2"
+            ? MAYA_LANGUAGES.find((language) => language.value === mayaLanguage)?.label
+            : undefined,
           messages: recent.map(({ role, content }) => ({ role, content })),
         }),
       });
@@ -551,7 +554,11 @@ export function LocalVoiceTest() {
     }
     try {
       const recognition = new Constructor();
-      recognition.lang = "en-IN";
+      const mayaRecognitionLocale: Record<MayaLanguage, string> = {
+        as: "as-IN", bn: "bn-IN", en: "en-IN", gu: "gu-IN", hi: "hi-IN", kn: "kn-IN",
+        ml: "ml-IN", mr: "mr-IN", or: "or-IN", pa: "pa-IN", ta: "ta-IN", te: "te-IN",
+      };
+      recognition.lang = speechEngine === "maya2" ? mayaRecognitionLocale[mayaLanguage] : "en-IN";
       recognition.continuous = false;
       recognition.interimResults = false;
       recognition.maxAlternatives = 1;
@@ -597,14 +604,14 @@ export function LocalVoiceTest() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Server className="h-5 w-5" /> Local voice mode · Ollama</CardTitle>
           <CardDescription>
-            A no-paid-model-API path inside Voice Reliability Lab: browser speech recognition → an Ollama model reachable by the PromptLab server → browser/system speech output. It uses a different pipeline from OpenAI Realtime and its results should be measured separately. The default endpoint works when PromptLab and Ollama run on the same machine, such as local development.
+            A no-paid-LLM-API path inside Voice Reliability Lab: browser speech recognition → an Ollama model reachable by the PromptLab server → browser/system or optional Maya 2 Native speech output. Maya runs on a separate configured inference host. This differs from OpenAI Realtime and its results should be measured separately.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
             <p className="flex items-center gap-2 font-medium"><AlertTriangle className="h-4 w-4" /> Local model, browser-managed speech</p>
             <p className="mt-1 text-muted-foreground">
-              PromptLab sends text to the Ollama endpoint configured for its server. A hosted PromptLab deployment will not automatically connect to Ollama on your personal Mac. Microphone transcription uses your browser's speech-recognition service, which may process audio online; do not assume the voice path is fully offline. Speech output uses browser/system voices. Local-mode transcripts and events are not saved to session history.
+              PromptLab sends text to the Ollama endpoint configured for its server. A hosted PromptLab deployment will not automatically connect to Ollama on your personal Mac. Microphone transcription uses your browser's speech-recognition service, which may process audio online; do not assume the voice path is fully offline. Speech output can use browser/system voices or the separately hosted Maya 2 Native server. Local-mode transcripts and events are not saved to session history.
             </p>
           </div>
 
