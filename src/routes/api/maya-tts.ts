@@ -108,7 +108,7 @@ async function checkPublicSpace(): Promise<{ ready: boolean; message: string; ba
 
 function findAudioUrl(value: unknown): string | null {
   if (typeof value === "string") {
-    return /^https?:\/\//i.test(value) && value.includes("gradio_api/file=") ? value : null;
+    return (/^https?:\/\//i.test(value) || value.startsWith("/")) && value.includes("gradio_api/file=") ? value : null;
   }
   if (Array.isArray(value)) {
     for (const item of value) {
