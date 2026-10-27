@@ -746,58 +746,7 @@ export function LocalVoiceTest() {
             </div>
             {mayaAudioUrl && speechEngine === "maya2" && <audio controls preload="none" src={mayaAudioUrl} className="w-full" />}
           </div>
-            <label className="space-y-1.5 text-sm font-medium">Spoken voice
-              <select
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm font-normal"
-                value={selectedVoiceURI}
-                onChange={(event) => setSelectedVoiceURI(event.target.value)}
-                disabled={voiceActive}
-              >
-                {availableVoices.length === 0 ? <option value="">Use system default voice</option> : availableVoices.map((voice) => (
-                  <option key={voice.voiceURI} value={voice.voiceURI}>{voice.name} · {voice.lang}{voice.default ? " · system default" : ""}</option>
-                ))}
-              </select>
-              <span className="block text-xs font-normal text-muted-foreground">Voice quality depends on voices installed in macOS and exposed by Chrome. An English India voice is preferred when available.</span>
-            </label>
-            <label className="space-y-2 text-sm font-medium">Speaking rate <span className="text-muted-foreground tabular-nums">{speechRate.toFixed(2)}×</span>
-              <input
-                type="range"
-                className="block w-full accent-emerald-600"
-                min="0.85"
-                max="1.15"
-                step="0.05"
-                value={speechRate}
-                onChange={(event) => setSpeechRate(Number(event.target.value))}
-                disabled={voiceActive}
-              />
-              <span className="block text-xs font-normal text-muted-foreground">Adjust pace for clarity and shorter playback time.</span>
-            </label>
-            <div className="flex items-center">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (!("speechSynthesis" in window)) return;
-                  window.speechSynthesis.cancel();
-                  const preview = new SpeechSynthesisUtterance("Hello, I'm your voice agent. How can I help you today?");
-                  const voice = availableVoices.find((candidate) => candidate.voiceURI === selectedVoiceURI);
-                  if (voice) {
-                    preview.voice = voice;
-                    preview.lang = voice.lang;
-                  } else {
-                    preview.lang = "en-IN";
-                  }
-                  preview.rate = speechRate;
-                  preview.pitch = 1;
-                  window.speechSynthesis.speak(preview);
-                }}
-                disabled={voiceActive || availableVoices.length === 0}
-              >
-                <Volume2 className="mr-2 h-4 w-4" /> Preview voice
-              </Button>
-            </div>
-          </div>
+
           <div className="flex flex-wrap items-center gap-3">
             {voiceActive ? (
               <Button type="button" variant="destructive" onClick={stopVoice}><MicOff className="mr-2 h-4 w-4" /> Stop microphone</Button>
