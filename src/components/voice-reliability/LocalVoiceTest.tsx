@@ -83,6 +83,7 @@ export function LocalVoiceTest() {
   const [ollamaReachable, setOllamaReachable] = useState<boolean | null>(null);
   const [checkingModels, setCheckingModels] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [events, setEvents] = useState<LocalEvent[]>([]);
   const [draft, setDraft] = useState("");
   const [status, setStatus] = useState<"idle" | "listening" | "thinking" | "speaking">("idle");
   const [voiceActive, setVoiceActive] = useState(false);
