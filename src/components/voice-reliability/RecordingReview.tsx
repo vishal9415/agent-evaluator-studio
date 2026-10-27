@@ -74,6 +74,45 @@ type PromptEvaluation = {
 };
 type SavedPrompt = { id: string; name: string; system_prompt: string; model: string; agent_type: string; begin_message?: string; stages?: Array<{ name: string; prompt: string; transitions?: Array<{ target?: string; condition?: string }> }> };
 
+function normalizeSavedPrompt(value: unknown): SavedPrompt | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.id !== "string" || typeof record.name !== "string") return null;
+
+  let stages: SavedPrompt["stages"];
+  if (Array.isArray(record.stages)) {
+    stages = [];
+    for (const item of record.stages) {
+      if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+      const stage = item as Record<string, unknown>;
+      if (typeof stage.name !== "string" || typeof stage.prompt !== "string") continue;
+
+      const transitions: NonNullable<NonNullable<SavedPrompt["stages"]>[number]["transitions"]> = [];
+      if (Array.isArray(stage.transitions)) {
+        for (const value of stage.transitions) {
+          if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+          const transition = value as Record<string, unknown>;
+          const normalized: { target?: string; condition?: string } = {};
+          if (typeof transition.target === "string") normalized.target = transition.target;
+          if (typeof transition.condition === "string") normalized.condition = transition.condition;
+          transitions.push(normalized);
+        }
+      }
+      stages.push({ name: stage.name, prompt: stage.prompt, ...(transitions.length ? { transitions } : {}) });
+    }
+  }
+
+  return {
+    id: record.id,
+    name: record.name,
+    system_prompt: typeof record.system_prompt === "string" ? record.system_prompt : "",
+    model: typeof record.model === "string" ? record.model : "",
+    agent_type: typeof record.agent_type === "string" ? record.agent_type : "",
+    begin_message: typeof record.begin_message === "string" ? record.begin_message : undefined,
+    stages,
+  };
+}
+
 type Recording = {
   id: string;
   file: File;
@@ -360,7 +399,7 @@ export function RecordingReview() {
     let cancelled = false;
     void loadSavedPrompts()
       .then((items) => {
-        if (!cancelled) setSavedPrompts((items ?? []) as SavedPrompt[]);
+        if (!cancelled) setSavedPrompts((items ?? []).map(normalizeSavedPrompt).filter((item): item is SavedPrompt => item !== null));
       })
       .catch((cause) => {
         if (!cancelled) setPromptLoadError(cause instanceof Error ? cause.message : "Could not load your saved prompts.");
@@ -664,10 +703,11 @@ export function RecordingReview() {
                     const sections = [selected.system_prompt.trim()];
                     if (selected.begin_message?.trim()) sections.push("Opening message:\n" + selected.begin_message.trim());
                     if (Array.isArray(selected.stages) && selected.stages.length) {
-                      sections.push("Conversation stages:\n" + selected.stages.map((stage) =>
-                        "Stage: " + (stage.name || "Unnamed") + "\n" + (stage.prompt || "")
-                          + ((stage.transitions ?? []).length ? "\nTransitions: " + stage.transitions.map((transition) => [transition.target, transition.condition].filter(Boolean).join(": ")).join("; ") : "")
-                      ).join("\n\n"));
+                      sections.push("Conversation stages:\n" + selected.stages.map((stage) => {
+                        const transitions = stage.transitions ?? [];
+                        return "Stage: " + (stage.name || "Unnamed") + "\n" + (stage.prompt || "")
+                          + (transitions.length ? "\nTransitions: " + transitions.map((transition) => [transition.target, transition.condition].filter(Boolean).join(": ")).join("; ") : "");
+                      }).join("\n\n"));
                     }
                     const combined = sections.filter(Boolean).join("\n\n");
                     if (combined.length > 20000) toast.warning("Saved prompt is longer than the 20,000-character review limit. The loaded prompt was truncated; verify it before evaluating.");
