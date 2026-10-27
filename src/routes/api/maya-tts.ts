@@ -139,34 +139,85 @@ function findAudioUrl(value: unknown): string | null {
 }
 
 function errorFromSse(body: string): string | null {
-  if (!/event:\s*error/i.test(body)) return null;
-  const data = body.split(/\r?\n/).find((line) => line.startsWith("data:"));
-  return data ? data.slice(5).trim().slice(0, 350) : "The public Maya demo returned an error.";
+  // Gradio sends multiple SSE blocks (progress/heartbeat/complete/error). Read
+  // the data attached to the error block rather than the first data line in the stream.
+  const blocks = body.split(/\r?\n\r?\n/);
+  for (const block of blocks) {
+    const lines = block.split(/\r?\n/);
+    const event = lines.find((line) => line.startsWith("event:"))?.slice(6).trim().toLowerCase();
+    if (event !== "error") continue;
+
+    const data = lines.filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).trim()).join("\n");
+    if (!data) return "The public Maya demo returned an error.";
+
+    try {
+      const parsed: unknown = JSON.parse(data);
+      if (typeof parsed === "string") return parsed.slice(0, 350);
+      if (parsed && typeof parsed === "object") {
+        const record = parsed as Record<string, unknown>;
+        const detail = typeof record.message === "string" ? record.message
+          : typeof record.error === "string" ? record.error
+          : typeof record.detail === "string" ? record.detail
+          : "";
+        if (detail) return detail.slice(0, 350);
+      }
+    } catch { /* Gradio can return plain text for an error event. */ }
+    return data.slice(0, 350);
+  }
+  return null;
 }
 
 async function generateViaPublicSpace(payload: TtsRequest): Promise<Response> {
   if (payload.input.length > 1200) return jsonError("The public Hugging Face demo limits text to 1,200 characters. Shorten the text or configure a private Maya server.", 413);
 
-  let accepted: Response;
-  try {
-    accepted = await fetch(PUBLIC_SPACE_BASE + "/gradio_api/call/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({
-        data: [payload.input, payload.language, payload.voice, payload.normalize, 0, null, "", payload.language],
-      }),
-      signal: AbortSignal.timeout(20000),
-      cache: "no-store",
-    });
-  } catch {
-    return jsonError("Could not reach the public Hugging Face Maya demo. Retry, or configure a private Maya server.", 502);
-  }
-  if (!accepted.ok) {
-    const text = (await accepted.text().catch(() => "")).slice(0, 250);
+  let accepted: Response | null = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) {
+      // Public Spaces can briefly return 502/503 while waking. Retry once so
+      // the user does not have to manually repeat the first request.
+      await new Promise((resolve) => setTimeout(resolve, 8000));
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(PUBLIC_SPACE_BASE + "/gradio_api/call/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          data: [payload.input, payload.language, payload.voice, payload.normalize, 0, null, "", payload.language],
+        }),
+        signal: AbortSignal.timeout(20000),
+        cache: "no-store",
+      });
+    } catch {
+      return jsonError("Could not reach the public Hugging Face Maya demo. Retry, or configure a private Maya server.", 502);
+    }
+
+    if (response.ok) {
+      accepted = response;
+      break;
+    }
+
+    const status = response.status;
+    const detail = (await response.text().catch(() => "")).slice(0, 250);
+    const retryable = status === 502 || status === 503 || status === 504;
+    if (retryable && attempt === 0) continue;
+
+    if (retryable) {
+      return jsonError(
+        "The public Hugging Face Maya demo is waking up or temporarily unavailable. Wait 30–60 seconds and click Preview voice again. " + detail,
+        503,
+      );
+    }
     return jsonError(
-      "The Hugging Face Maya demo could not accept the request (HTTP " + accepted.status + "). " + text,
-      accepted.status === 429 ? 429 : 502,
+      "The Hugging Face Maya demo could not accept the request (HTTP " + status + "). " + detail,
+      status === 429 ? 429 : 502,
     );
+  }
+
+  if (!accepted) {
+    return jsonError("The public Hugging Face Maya demo is still starting. Wait 30–60 seconds and try again.", 503);
   }
 
   let job: { event_id?: unknown };
