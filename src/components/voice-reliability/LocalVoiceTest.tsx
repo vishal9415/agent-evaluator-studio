@@ -742,7 +742,7 @@ export function LocalVoiceTest() {
                 {mayaGenerating ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Volume2 className="mr-2 h-4 w-4" />} Preview voice
               </Button>
               {mayaServerReady === true && speechEngine === "maya2" && <span className="text-xs text-emerald-700 dark:text-emerald-300">Maya ready</span>}
-              {speechEngine === "maya2" && mayaServerReady !== true && <span className="text-xs text-amber-700 dark:text-amber-300">Configure/check the Maya server first</span>}
+              {speechEngine === "maya2" && mayaServerReady !== true && <span className="text-xs text-amber-700 dark:text-amber-300">Click Check server first</span>}
             </div>
             {mayaAudioUrl && speechEngine === "maya2" && <audio controls preload="none" src={mayaAudioUrl} className="w-full" />}
           </div>
