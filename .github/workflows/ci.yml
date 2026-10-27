@@ -46,6 +46,8 @@ jobs:
           bunx eslint
           --rule 'prettier/prettier: off'
           src/components/voice-reliability/LiveRealtimeTest.tsx
+          src/components/voice-reliability/LocalVoiceTest.tsx
+          src/routes/api/maya-tts.ts
           src/lib/voice-adapters
           src/lib/public-demo.server.ts
           src/routes/_authenticated/voice-reliability.tsx
