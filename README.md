@@ -59,7 +59,9 @@ The Voice Reliability Lab connects to OpenAI Realtime through server-side SDP ne
 
 PromptLab's Local Voice mode can use **Maya 2 Native** as an alternative speech-output engine. Ollama still generates the assistant's text; Maya converts the completed reply to speech in one of 12 supported languages and 20 built-in voices. This is a TTS integration, not a transcription or prompt-evaluation model. The model is licensed under Apache-2.0; preserve the model and upstream-component notices if redistributing the serving stack. See the [Maya 2 Native model card](https://huggingface.co/maya-research/maya2-native) and [upstream inference code](https://github.com/MayaResearch/maya2-native).
 
-**Deployment requirement:** Maya's documented serving stack expects Linux, Python 3.10–3.12, an NVIDIA GPU with CUDA 12.8 support, and approximately 9.2 GB peak GPU memory at one seat (12 GB GPU recommended for headroom). It is not a suitable local model to load directly into PromptLab's browser or the user's 8 GB Mac setup. Run it on a separate supported inference host.
+**Demo mode:** when `MAYA_TTS_BASE_URL` is not set, PromptLab calls the public [Hugging Face Maya demo Space](https://huggingface.co/spaces/hugging-apps/maya2-native). This avoids running a GPU server for an initial prototype test, but it uses a shared queue, can be unavailable, and sends the selected spoken text to Hugging Face. Do not use that fallback with confidential customer data.
+
+**Private/self-hosted mode:** Maya's documented serving stack expects Linux, Python 3.10–3.12, an NVIDIA GPU with CUDA 12.8 support, and approximately 9.2 GB peak GPU memory at one seat (12 GB GPU recommended for headroom). It is not a suitable local model to load directly into PromptLab's browser or the user's 8 GB Mac setup. Run it on a separate supported inference host.
 
 Install and start the model on that host using the commands from the upstream model card:
 
@@ -75,12 +77,12 @@ python -m maya3.server \
 
 The server's default loopback binding is appropriate only when PromptLab runs on the same host. For a hosted PromptLab deployment, configure a **private network route or a secured reverse proxy** to the Maya server and set the URL reachable from the PromptLab server. The upstream reference server has no built-in authentication; do not expose it directly to the public internet. If a reverse proxy requires bearer authentication, set `MAYA_TTS_BEARER_TOKEN` as a server-only secret.
 
-Required PromptLab server variable:
+Optional PromptLab server variables:
 
-- `MAYA_TTS_BASE_URL`: base URL of the Maya server (the route appends `/health` or `/v1/audio/speech`).
+- `MAYA_TTS_BASE_URL`: base URL of a private Maya server (the route appends `/health` or `/v1/audio/speech`). If unset, the public Hugging Face demo is used instead.
 - `MAYA_TTS_BEARER_TOKEN`: optional server-only bearer token used only when the configured reverse proxy expects it.
 
-After configuring the endpoint, open **Voice Reliability Studio → Local Voice Mode → Speech output engine → Maya 2 Native**, choose a language and voice, use **Check server**, then **Preview voice** or start a voice conversation. Audio generation runs on the configured Maya host; audio is returned to the browser and is not persisted by PromptLab. Generated voice latency is end-to-end playback latency, not a real-time carrier metric.
+After syncing the code, open **Voice Reliability Studio → Local Voice Mode → Speech output engine → Maya 2 Native**, choose a language and voice, use **Check server**, then **Preview voice** or start a voice conversation. The generated audio is returned to the browser and not persisted by PromptLab. Generated voice latency is end-to-end playback latency, not a real-time carrier metric.
 
 ### Existing recording review
 
