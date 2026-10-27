@@ -9,6 +9,23 @@ import { supabase } from "@/integrations/supabase/client";
 import { listLocalVoiceModels } from "@/lib/local-voice.functions";
 
 type LocalModel = "ollama/llama3.2:1b" | "ollama/llama3.2:3b" | "ollama/qwen3:4b";
+type SpeechEngine = "browser" | "maya2";
+type MayaLanguage = "as" | "bn" | "en" | "gu" | "hi" | "kn" | "ml" | "mr" | "or" | "pa" | "ta" | "te";
+type MayaVoice = "Ahana" | "Vaidehi" | "Malini" | "Charvi" | "Jahnavi" | "Anirban" | "Nakul" | "Vasant" | "Siddhant" | "Satvik" | "Abhay" | "Nivedita" | "Ishwari" | "Ritvik" | "Vrinda" | "Sreekar" | "Kayal" | "Shaunak" | "Akshat" | "Tanushree";
+
+const MAYA_LANGUAGES: Array<{ value: MayaLanguage; label: string }> = [
+  { value: "as", label: "Assamese" }, { value: "bn", label: "Bengali" },
+  { value: "en", label: "English" }, { value: "gu", label: "Gujarati" },
+  { value: "hi", label: "Hindi" }, { value: "kn", label: "Kannada" },
+  { value: "ml", label: "Malayalam" }, { value: "mr", label: "Marathi" },
+  { value: "or", label: "Odia" }, { value: "pa", label: "Punjabi" },
+  { value: "ta", label: "Tamil" }, { value: "te", label: "Telugu" },
+];
+const MAYA_VOICES: MayaVoice[] = [
+  "Ahana", "Vaidehi", "Malini", "Charvi", "Jahnavi", "Anirban", "Nakul", "Vasant",
+  "Siddhant", "Satvik", "Abhay", "Nivedita", "Ishwari", "Ritvik", "Vrinda",
+  "Sreekar", "Kayal", "Shaunak", "Akshat", "Tanushree",
+];
 type ChatMessage = { role: "user" | "assistant"; content: string; id: number };
 type LocalEvent = { id: number; elapsedMs: number; type: string; detail: string };
 type RecognitionAlternativeLike = { transcript: string };
@@ -74,8 +91,18 @@ export function LocalVoiceTest() {
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedVoiceURI, setSelectedVoiceURI] = useState("");
   const [speechRate, setSpeechRate] = useState(1);
-  const [events, setEvents] = useState<LocalEvent[]>([]);
+  const [speechEngine, setSpeechEngine] = useState<SpeechEngine>("browser");
+  const [mayaLanguage, setMayaLanguage] = useState<MayaLanguage>("hi");
+  const [mayaVoice, setMayaVoice] = useState<MayaVoice>("Ahana");
+  const [mayaServerReady, setMayaServerReady] = useState<boolean | null>(null);
+  const [mayaServerMessage, setMayaServerMessage] = useState("Maya server status not checked.");
+  const [mayaChecking, setMayaChecking] = useState(false);
+  const [mayaGenerating, setMayaGenerating] = useState(false);
+  const [mayaAudioUrl, setMayaAudioUrl] = useState("");
   const recognizerRef = useRef<RecognitionLike | null>(null);
+  const mayaAudioRef = useRef<HTMLAudioElement | null>(null);
+  const mayaObjectUrlRef = useRef<string | null>(null);
+  const mayaPlaybackCancelRef = useRef<(() => void) | null>(null);
   const startRecognizerRef = useRef<(() => void) | null>(null);
   const sendMessageRef = useRef<((text: string, fromVoice: boolean) => Promise<void>) | null>(null);
   const voiceActiveRef = useRef(false);
@@ -113,9 +140,110 @@ export function LocalVoiceTest() {
     }
   }, [checkModels]);
 
+  const refreshMayaStatus = useCallback(async () => {
+    setMayaChecking(true);
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session?.access_token) {
+        setMayaServerReady(false);
+        setMayaServerMessage("Sign in to check the Maya server.");
+        return;
+      }
+      const response = await fetch("/api/maya-tts", {
+        method: "GET",
+        headers: { Authorization: "Bearer " + sessionData.session.access_token },
+        cache: "no-store",
+      });
+      const result = await response.json().catch(() => ({})) as { configured?: boolean; ready?: boolean; message?: string };
+      setMayaServerReady(result.ready === true);
+      setMayaServerMessage(result.message || (response.ok ? "Maya server status received." : "Could not check Maya server."));
+    } catch {
+      setMayaServerReady(false);
+      setMayaServerMessage("Could not reach PromptLab's Maya status endpoint.");
+    } finally {
+      setMayaChecking(false);
+    }
+  }, []);
+
   useEffect(() => {
     void refreshModels();
-  }, [refreshModels]);
+    void refreshMayaStatus();
+  }, [refreshModels, refreshMayaStatus]);
+
+  useEffect(() => () => {
+    mayaAudioRef.current?.pause();
+    if (mayaObjectUrlRef.current) URL.revokeObjectURL(mayaObjectUrlRef.current);
+  }, []);
+
+  const synthesizeAndPlayMaya = async (text: string, source: "preview" | "conversation") => {
+    const speechText = text.trim().slice(0, 2500);
+    if (!speechText) throw new Error("There is no speech text to synthesize.");
+    setMayaGenerating(true);
+    const started = performance.now();
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session?.access_token) throw new Error("Sign in again before using Maya 2 Native.");
+      const response = await fetch("/api/maya-tts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + sessionData.session.access_token,
+        },
+        body: JSON.stringify({
+          input: speechText,
+          language: mayaLanguage,
+          voice: mayaVoice,
+          response_format: "wav",
+          normalize: true,
+        }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({})) as { error?: string };
+        throw new Error(payload.error || "Maya speech request failed (HTTP " + response.status + ").");
+      }
+      const blob = await response.blob();
+      if (!blob.size || (!blob.type.startsWith("audio/") && blob.type !== "application/octet-stream")) {
+        throw new Error("Maya returned no playable audio. Check the model server response format.");
+      }
+
+      const url = URL.createObjectURL(blob);
+      if (mayaObjectUrlRef.current) URL.revokeObjectURL(mayaObjectUrlRef.current);
+      mayaObjectUrlRef.current = url;
+      setMayaAudioUrl(url);
+      const audio = new Audio(url);
+      mayaAudioRef.current = audio;
+      speakingRef.current = true;
+      setStatus("speaking");
+      pushEvent("maya.tts_requested", "Maya 2 Native generating " + mayaLanguage + " speech with voice " + mayaVoice);
+      await new Promise<void>((resolve, reject) => {
+        let settled = false;
+        const finish = (error?: Error) => {
+          if (settled) return;
+          settled = true;
+          if (mayaPlaybackCancelRef.current === cancel) mayaPlaybackCancelRef.current = null;
+          audio.onended = null;
+          audio.onerror = null;
+          audio.onpause = null;
+          if (error) reject(error); else resolve();
+        };
+        const cancel = () => finish();
+        mayaPlaybackCancelRef.current = cancel;
+        audio.onended = () => finish();
+        audio.onerror = () => finish(new Error("Maya audio playback failed. Use the audio player below to retry."));
+        audio.onpause = () => {
+          if (audio.currentTime > 0 && !audio.ended) finish();
+        };
+        audio.play().catch(() => finish(new Error("The browser blocked Maya audio playback. Use the audio player below to play the generated speech.")));
+      });
+      pushEvent("maya.tts_playback_finished", "Maya speech playback completed in " + Math.round(performance.now() - started) + " ms");
+    } finally {
+      speakingRef.current = false;
+      setMayaGenerating(false);
+      setStatus(voiceActiveRef.current ? (processingRef.current ? "thinking" : "listening") : "idle");
+      if (voiceActiveRef.current) scheduleRecognitionRestart();
+      if (source === "preview") pushEvent("maya.tts_preview_finished", "Maya preview request completed");
+    }
+  };
 
   useEffect(() => {
     if (!("speechSynthesis" in window)) return;
@@ -239,6 +367,8 @@ export function LocalVoiceTest() {
     try { recognizerRef.current?.abort(); } catch { /* recognizer already stopped */ }
     recognizerRef.current = null;
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    mayaAudioRef.current?.pause();
+    mayaPlaybackCancelRef.current?.();
     speechQueueRef.current = [];
     speechStreamCompleteRef.current = false;
     setStatus("idle");
@@ -313,7 +443,7 @@ export function LocalVoiceTest() {
         setMessages((previous) => previous.map((message) =>
           message.id === assistantId ? { ...message, content: reply } : message,
         ));
-        if (fromVoice && voiceActiveRef.current && "speechSynthesis" in window) {
+        if (fromVoice && voiceActiveRef.current && speechEngine === "browser" && "speechSynthesis" in window) {
           speechBuffer += delta;
           const sentenceEnd = /[.!?](?:\s+|$)/g;
           let end = 0;
@@ -371,7 +501,21 @@ export function LocalVoiceTest() {
       setLastLatencyMs(firstTokenLatencyMs ?? fullLatency);
       pushEvent("ollama.response_received", "Full response generated in " + fullLatency + " ms");
 
-      if (fromVoice && voiceActiveRef.current && "speechSynthesis" in window) {
+      if (fromVoice && voiceActiveRef.current && speechEngine === "maya2") {
+        speechStreamCompleteRef.current = true;
+        try {
+          await synthesizeAndPlayMaya(reply, "conversation");
+        } catch (cause) {
+          const message = cause instanceof Error ? cause.message : "Maya speech generation failed.";
+          setError(message);
+          pushEvent("maya.tts_failed", message);
+        } finally {
+          speakingRef.current = false;
+          processingRef.current = false;
+          setStatus(voiceActiveRef.current ? "listening" : "idle");
+          scheduleRecognitionRestart();
+        }
+      } else if (fromVoice && voiceActiveRef.current && speechEngine === "browser" && "speechSynthesis" in window) {
         if (speechBuffer.trim()) queueSpeech(speechBuffer);
         speechStreamCompleteRef.current = true;
         speakNextRef.current?.();
@@ -493,7 +637,108 @@ export function LocalVoiceTest() {
             <span className="block text-xs font-normal text-muted-foreground">{instructions.length}/5000 characters. These instructions are used for local-mode replies only.</span>
           </label>
 
-          <div className="grid gap-4 rounded-xl border border-border/70 bg-muted/20 p-4 sm:grid-cols-[minmax(0,1fr)_220px]">
+          <div className="space-y-4 rounded-xl border border-border/70 bg-muted/20 p-4">
+            <div className="grid gap-4 md:grid-cols-3">
+              <label className="space-y-1.5 text-sm font-medium">Speech output engine
+                <select
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm font-normal"
+                  value={speechEngine}
+                  onChange={(event) => setSpeechEngine(event.target.value as SpeechEngine)}
+                  disabled={voiceActive || status === "thinking" || status === "speaking" || mayaGenerating}
+                >
+                  <option value="browser">Browser / macOS system voice</option>
+                  <option value="maya2">Maya 2 Native · self-hosted</option>
+                </select>
+                <span className="block text-xs font-normal text-muted-foreground">Ollama still generates the agent's text. Maya is an optional speech-output model.</span>
+              </label>
+              {speechEngine === "maya2" ? (
+                <>
+                  <label className="space-y-1.5 text-sm font-medium">Maya speech language
+                    <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm font-normal" value={mayaLanguage} onChange={(event) => setMayaLanguage(event.target.value as MayaLanguage)} disabled={voiceActive || mayaGenerating}>
+                      {MAYA_LANGUAGES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                    <span className="block text-xs font-normal text-muted-foreground">12 supported languages, including Hindi and English.</span>
+                  </label>
+                  <label className="space-y-1.5 text-sm font-medium">Maya voice
+                    <select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm font-normal" value={mayaVoice} onChange={(event) => setMayaVoice(event.target.value as MayaVoice)} disabled={voiceActive || mayaGenerating}>
+                      {MAYA_VOICES.map((voice) => <option key={voice} value={voice}>{voice}</option>)}
+                    </select>
+                    <span className="block text-xs font-normal text-muted-foreground">20 built-in voice personas.</span>
+                  </label>
+                </>
+              ) : (
+                <>
+                  <label className="space-y-1.5 text-sm font-medium">Spoken voice
+                    <select
+                      className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm font-normal"
+                      value={selectedVoiceURI}
+                      onChange={(event) => setSelectedVoiceURI(event.target.value)}
+                      disabled={voiceActive}
+                    >
+                      {availableVoices.length === 0 ? <option value="">Use system default voice</option> : availableVoices.map((voice) => (
+                        <option key={voice.voiceURI} value={voice.voiceURI}>{voice.name} · {voice.lang}{voice.default ? " · system default" : ""}</option>
+                      ))}
+                    </select>
+                    <span className="block text-xs font-normal text-muted-foreground">Uses voices installed in macOS and exposed by Chrome.</span>
+                  </label>
+                  <label className="space-y-2 text-sm font-medium">Speaking rate <span className="text-muted-foreground tabular-nums">{speechRate.toFixed(2)}×</span>
+                    <input type="range" className="block w-full accent-emerald-600" min="0.85" max="1.15" step="0.05" value={speechRate} onChange={(event) => setSpeechRate(Number(event.target.value))} disabled={voiceActive} />
+                    <span className="block text-xs font-normal text-muted-foreground">Adjust pace for clarity and shorter playback time.</span>
+                  </label>
+                </>
+              )}
+            </div>
+            {speechEngine === "maya2" && (
+              <div className="rounded-lg border border-border bg-background/70 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-start gap-2">
+                    <Server className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">Maya server</p>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">{mayaServerMessage}</p>
+                    </div>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={() => void refreshMayaStatus()} disabled={mayaChecking || voiceActive || mayaGenerating}>
+                    <RefreshCw className={"mr-2 h-4 w-4 " + (mayaChecking ? "animate-spin" : "")} /> Check server
+                  </Button>
+                </div>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">The Hugging Face model runs on a separate inference server; PromptLab needs a private reachable MAYA_TTS_BASE_URL. The reference server has no built-in authentication, so do not expose it directly to the public internet.</p>
+              </div>
+            )}
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (speechEngine === "maya2") {
+                    void synthesizeAndPlayMaya("Hello, I'm your voice agent. How can I help you today?", "preview")
+                      .catch((cause) => setError(cause instanceof Error ? cause.message : "Maya preview failed."));
+                    return;
+                  }
+                  if (!("speechSynthesis" in window)) return;
+                  window.speechSynthesis.cancel();
+                  const preview = new SpeechSynthesisUtterance("Hello, I'm your voice agent. How can I help you today?");
+                  const voice = availableVoices.find((candidate) => candidate.voiceURI === selectedVoiceURI);
+                  if (voice) {
+                    preview.voice = voice;
+                    preview.lang = voice.lang;
+                  } else {
+                    preview.lang = "en-IN";
+                  }
+                  preview.rate = speechRate;
+                  preview.pitch = 1;
+                  window.speechSynthesis.speak(preview);
+                }}
+                disabled={voiceActive || mayaGenerating || (speechEngine === "browser" && availableVoices.length === 0) || (speechEngine === "maya2" && mayaServerReady !== true)}
+              >
+                {mayaGenerating ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Volume2 className="mr-2 h-4 w-4" />} Preview voice
+              </Button>
+              {mayaServerReady === true && speechEngine === "maya2" && <span className="text-xs text-emerald-700 dark:text-emerald-300">Maya ready</span>}
+              {speechEngine === "maya2" && mayaServerReady !== true && <span className="text-xs text-amber-700 dark:text-amber-300">Configure/check the Maya server first</span>}
+            </div>
+            {mayaAudioUrl && speechEngine === "maya2" && <audio controls preload="none" src={mayaAudioUrl} className="w-full" />}
+          </div>
             <label className="space-y-1.5 text-sm font-medium">Spoken voice
               <select
                 className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm font-normal"
@@ -550,7 +795,7 @@ export function LocalVoiceTest() {
             {voiceActive ? (
               <Button type="button" variant="destructive" onClick={stopVoice}><MicOff className="mr-2 h-4 w-4" /> Stop microphone</Button>
             ) : (
-              <Button type="button" onClick={startVoice} disabled={!installedModels.includes(model) || status === "thinking" || status === "speaking"}><Mic className="mr-2 h-4 w-4" /> Start voice conversation</Button>
+              <Button type="button" onClick={startVoice} disabled={!installedModels.includes(model) || status === "thinking" || status === "speaking" || mayaGenerating || (speechEngine === "maya2" && mayaServerReady !== true)}><Mic className="mr-2 h-4 w-4" /> Start voice conversation</Button>
             )}
             <span className="rounded-md bg-muted px-3 py-2 text-sm">Status: <strong>{STATUS_LABELS[status]}</strong></span>
             {lastLatencyMs !== null && <span className="text-sm text-muted-foreground">Time to first token: <strong className="text-foreground tabular-nums">{lastLatencyMs} ms</strong></span>}
@@ -575,7 +820,7 @@ export function LocalVoiceTest() {
           ))}
           <form className="flex gap-2" onSubmit={submitText}>
             <Input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Type a test message…" maxLength={4000} disabled={!installedModels.includes(model) || status === "thinking" || status === "speaking"} />
-            <Button type="submit" disabled={!draft.trim() || !installedModels.includes(model) || status === "thinking" || status === "speaking"}>Send</Button>
+            <Button type="submit" disabled={!draft.trim() || !installedModels.includes(model) || status === "thinking" || status === "speaking" || mayaGenerating}>Send</Button>
           </form>
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" size="sm" onClick={() => { setMessages([]); setEvents([]); setLastLatencyMs(null); setError(""); }} disabled={messages.length === 0 || voiceActive || status === "thinking" || status === "speaking"}>Clear local conversation</Button>
