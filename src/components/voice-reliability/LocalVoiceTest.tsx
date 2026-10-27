@@ -709,7 +709,7 @@ export function LocalVoiceTest() {
                     <RefreshCw className={"mr-2 h-4 w-4 " + (mayaChecking ? "animate-spin" : "")} /> Check server
                   </Button>
                 </div>
-                <p className="mt-2 text-xs leading-5 text-muted-foreground">The Hugging Face model runs on a separate inference server; PromptLab needs a private reachable MAYA_TTS_BASE_URL. The reference server has no built-in authentication, so do not expose it directly to the public internet.</p>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">Without MAYA_TTS_BASE_URL, PromptLab uses the shared public Hugging Face demo. Speech text is sent to Hugging Face; shared queue and availability limits apply, so do not send sensitive customer data. For confidential or production use, set MAYA_TTS_BASE_URL to a private endpoint. The reference server has no built-in authentication, so do not expose it directly to the public internet.</p>
               </div>
             )}
             <div className="flex flex-wrap items-center gap-3">
