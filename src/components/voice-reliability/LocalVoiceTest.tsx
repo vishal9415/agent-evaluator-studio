@@ -654,7 +654,7 @@ export function LocalVoiceTest() {
                   disabled={voiceActive || status === "thinking" || status === "speaking" || mayaGenerating}
                 >
                   <option value="browser">Browser / macOS system voice</option>
-                  <option value="maya2">Maya 2 Native · self-hosted</option>
+                  <option value="maya2">Maya 2 Native · HF demo / private server</option>
                 </select>
                 <span className="block text-xs font-normal text-muted-foreground">Ollama still generates the agent's text. Maya is an optional speech-output model.</span>
               </label>
