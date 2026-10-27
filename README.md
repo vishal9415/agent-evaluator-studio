@@ -55,6 +55,33 @@ The authenticated app contains:
 The Voice Reliability Lab connects to OpenAI Realtime through server-side SDP negotiation. It persists session metadata and event timing only; raw audio and transcript text are not stored. A browser-observed speech-stop-to-response-created gap is not provider processing latency or time-to-audible response.
 
 
+### Maya 2 Native speech output (optional)
+
+PromptLab's Local Voice mode can use **Maya 2 Native** as an alternative speech-output engine. Ollama still generates the assistant's text; Maya converts the completed reply to speech in one of 12 supported languages and 20 built-in voices. This is a TTS integration, not a transcription or prompt-evaluation model. The model is licensed under Apache-2.0; preserve the model and upstream-component notices if redistributing the serving stack. See the [Maya 2 Native model card](https://huggingface.co/maya-research/maya2-native) and [upstream inference code](https://github.com/MayaResearch/maya2-native).
+
+**Deployment requirement:** Maya's documented serving stack expects Linux, Python 3.10–3.12, an NVIDIA GPU with CUDA 12.8 support, and approximately 9.2 GB peak GPU memory at one seat (12 GB GPU recommended for headroom). It is not a suitable local model to load directly into PromptLab's browser or the user's 8 GB Mac setup. Run it on a separate supported inference host.
+
+Install and start the model on that host using the commands from the upstream model card:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install "maya3[server] @ git+https://github.com/MayaResearch/maya2-native" \
+  --extra-index-url https://download.pytorch.org/whl/cu128
+python -m maya3.server \
+  --ckpt maya-research/maya2-native \
+  --host 127.0.0.1 --port 8080 --max-seats 1
+```
+
+The server's default loopback binding is appropriate only when PromptLab runs on the same host. For a hosted PromptLab deployment, configure a **private network route or a secured reverse proxy** to the Maya server and set the URL reachable from the PromptLab server. The upstream reference server has no built-in authentication; do not expose it directly to the public internet. If a reverse proxy requires bearer authentication, set `MAYA_TTS_BEARER_TOKEN` as a server-only secret.
+
+Required PromptLab server variable:
+
+- `MAYA_TTS_BASE_URL`: base URL of the Maya server (the route appends `/health` or `/v1/audio/speech`).
+- `MAYA_TTS_BEARER_TOKEN`: optional server-only bearer token used only when the configured reverse proxy expects it.
+
+After configuring the endpoint, open **Voice Reliability Studio → Local Voice Mode → Speech output engine → Maya 2 Native**, choose a language and voice, use **Check server**, then **Preview voice** or start a voice conversation. Audio generation runs on the configured Maya host; audio is returned to the browser and is not persisted by PromptLab. Generated voice latency is end-to-end playback latency, not a real-time carrier metric.
+
 ### Existing recording review
 
 The Voice Reliability Studio includes a client-side **Recording Review** section before the Design Partner workspace. Users can add up to 10 audio files per batch (maximum 25 MB per file and 100 MB total), play them back, and run local signal checks for possible clipping, low average level, and long low-level segments. Files are held in the current browser session and are not stored by PromptLab.
